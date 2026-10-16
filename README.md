@@ -1,4 +1,4 @@
-# Ludum Dare — Unreal Engine 5 Template ++++
+# Ludum Dare — Unreal Engine 5 Template
 
 A lightweight **Unreal Engine 5.8 project template for Ludum Dare**. It provides a simple starting point for building a jam game, with settings aimed at lower-end computers and smaller downloads.
 
