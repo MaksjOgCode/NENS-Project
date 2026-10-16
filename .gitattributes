@@ -1,0 +1,7 @@
+* text=auto
+*.umap binary
+*.uasset binary
+*.py text eol=lf
+*.ini text eol=lf
+*.uproject text eol=lf
+*.md text eol=lf

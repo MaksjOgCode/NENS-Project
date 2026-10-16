@@ -1,0 +1,15 @@
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vs/
+.idea/
+*.sln
+*.suo
+*.code-workspace
+Packaged/
+
+# Generated distributable; source files are tracked directly.
+/*-template.zip
+__pycache__/
+*.pyc
