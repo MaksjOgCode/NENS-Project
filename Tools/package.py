@@ -20,7 +20,7 @@ def main():
     if not (root / 'Content/Maps/Startup.umap').is_file():
         parser.error('Startup.umap is missing')
     output = (args.output or root / 'Packaged' / target).resolve()
-    command = [str(uat), 'BuildCookRun', f'-project={root / "LudumDare.uproject"}',
+    command = [str(uat), 'BuildCookRun', f'-project={root / "NENS_Project.uproject"}',
                '-noP4', '-utf8output', f'-platform={target}', '-clientconfig=Shipping',
                '-build', '-cook', '-map=/Game/Maps/Startup', '-stage', '-pak', '-iostore',
                '-compressed', '-package', '-archive', f'-archivedirectory={output}']

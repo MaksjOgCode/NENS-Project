@@ -34,7 +34,7 @@ Platform configuration is included, but packaged games and rendering still need 
 ## Getting started
 
 1. Install Unreal Engine **5.8**.
-2. Open `LudumDare.uproject`. If Unreal cannot find UE 5.8, use **Switch Unreal Engine Version** to select your local installation.
+2. Open `NENS_Project.uproject`. If Unreal cannot find UE 5.8, use **Switch Unreal Engine Version** to select your local installation.
 3. Open `Content/Maps/Startup.umap` and start building your game.
 4. Add geometry and lighting before pressing Play—the starter level is intentionally empty.
 
@@ -68,7 +68,7 @@ Only English language data is included by default. Add other languages in the pa
 - `Config/DefaultScalability.ini` — graphics quality presets, including Bloom and SMAA.
 - `Config/DefaultGameUserSettings.ini` — initial resolution and quality settings.
 - `Config/DefaultGame.ini` — project details and packaging options.
-- `LudumDare.uproject` — engine association and enabled plugins.
+- `NENS_Project.uproject` — engine association and enabled plugins.
 
 The initial template was checked with UE 5.8.1 using a headless configuration test. That check covered map loading and rendering settings, not visual quality, frame rates, or finished builds on all three platforms.
 

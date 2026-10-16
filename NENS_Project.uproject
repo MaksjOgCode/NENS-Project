@@ -4,11 +4,6 @@
 	"Category": "Games",
 	"Description": "Minimal desktop Forward + SMAA + Bloom starter",
 	"DisableEnginePluginsByDefault": true,
-	"TargetPlatforms": [
-		"Windows",
-		"Linux",
-		"Mac"
-	],
 	"Plugins": [
 		{
 			"Name": "PluginBrowser",
@@ -58,6 +53,20 @@
 			"TargetAllowList": [
 				"Editor"
 			]
+		},
+		{
+			"Name": "Paper2D",
+			"Enabled": true
+		},
+		{
+			"Name": "PaperZD",
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/c4b43502026047d89296cd7bffd92828"
 		}
+	],
+	"TargetPlatforms": [
+		"Windows",
+		"Linux",
+		"Mac"
 	]
 }
