@@ -274,6 +274,97 @@ FString UInspectionEditorLibrary::ConfigureInspection()
     return TEXT("{\"success\":true,\"blueprints\":5,\"scene\":\"DA_Inspection_Wardrobe\"}");
 }
 
+FString UInspectionEditorLibrary::ConfigureSearchableActor(UBlueprint* Blueprint, UInspectionSceneData* Scene)
+{
+    using namespace InspectionSetup;
+    SetupError.Reset();
+    auto* Base = LoadObject<UBlueprint>(nullptr, TEXT("/Game/NENS/Gameplay/Interaction/Blueprints/BP_InteractableBase.BP_InteractableBase"));
+    auto* Widget = LoadObject<UWidgetBlueprint>(nullptr, TEXT("/Game/NENS/UI/Inspection/WBP_InspectionScene.WBP_InspectionScene"));
+    REQUIRE_SETUP(Blueprint && Blueprint->GeneratedClass && Base && Widget && Scene, TEXT("Actor, shared widget or scene data is missing"));
+    REQUIRE_SETUP(Blueprint->GeneratedClass->IsChildOf(Base->GeneratedClass) && Blueprint != Base, TEXT("Expected a child Blueprint of BP_InteractableBase"));
+    FString DataError;
+    REQUIRE_SETUP(Scene->ValidateScene(DataError), DataError);
+    USimpleConstructionScript* SCS = Blueprint->SimpleConstructionScript;
+    auto* ActorGraph = Graph(Blueprint, TEXT("EventGraph"));
+    REQUIRE_SETUP(SCS && ActorGraph, TEXT("Actor SCS or EventGraph is missing"));
+
+    // Check before replacing anything: never overwrite an object's custom interaction.
+    UK2Node_Event* Interact = nullptr;
+    for (UEdGraphNode* N : ActorGraph->Nodes)
+        if (auto* E = Cast<UK2Node_Event>(N))
+            if (E->EventReference.GetMemberName() == TEXT("Interact")) Interact = E;
+    REQUIRE_SETUP(Interact && Interact->FindPin(TEXT("Interactor")), TEXT("Actor Interact event is missing"));
+    if (!HasMarker(ActorGraph, TEXT("Inspection.Open")))
+    {
+        for (auto* P : Interact->FindPinChecked(TEXT("then"))->LinkedTo)
+        {
+            auto* Old = Cast<UK2Node_CallFunction>(P->GetOwningNode());
+            REQUIRE_SETUP(Old && Old->FunctionReference.GetMemberName() == TEXT("PrintString"), TEXT("Actor has non-demo interaction logic; refusing to replace"));
+        }
+    }
+
+    Blueprint->Modify();
+    auto* SearchNode = SCS->FindSCSNode(TEXT("Searchable"));
+    if (!SearchNode)
+    {
+        REQUIRE_SETUP(!FindFProperty<FObjectProperty>(Blueprint->GeneratedClass, TEXT("Searchable")), TEXT("Inherited Searchable component requires configuring its existing template"));
+        SearchNode = SCS->CreateNode(USearchableComponent::StaticClass(), TEXT("Searchable"));
+        SCS->AddNode(SearchNode);
+    }
+    auto* Search = Cast<USearchableComponent>(SearchNode->ComponentTemplate);
+    REQUIRE_SETUP(Search, TEXT("Searchable name belongs to a different component"));
+    Search->Scene = Scene;
+    Search->SceneWidgetClass = Widget->GeneratedClass;
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    REQUIRE_SETUP(SuccessJSON(CompileAndSave(Blueprint, false)), TEXT("Actor component compile failed"));
+
+    if (!HasMarker(ActorGraph, TEXT("Inspection.Open")))
+    {
+        auto* Open = Call(ActorGraph, UInspectionBlueprintLibrary::StaticClass(), TEXT("OpenInspection"), 650, 1200, TEXT("Inspection.Open"));
+        auto* Self = Add<UK2Node_Self>(ActorGraph, 400, 1400);
+        REQUIRE_SETUP(Open, SetupError);
+        Interact->FindPinChecked(TEXT("then"))->BreakAllPinLinks();
+        REQUIRE_SETUP(Link(Interact->FindPinChecked(TEXT("then")), Open->GetExecPin())
+            && Link(Interact->FindPinChecked(TEXT("Interactor")), Open->FindPinChecked(TEXT("Interactor")))
+            && Link(Self->FindPinChecked(TEXT("self")), Open->FindPinChecked(TEXT("Target"))), SetupError);
+    }
+    if (!HasMarker(ActorGraph, TEXT("Inspection.Closed")))
+    {
+        auto* Property = FindFProperty<FObjectProperty>(Blueprint->GeneratedClass, TEXT("Searchable"));
+        auto* Delegate = FindFProperty<FMulticastDelegateProperty>(USearchableComponent::StaticClass(), TEXT("OnInspectionClosed"));
+        REQUIRE_SETUP(Property && Delegate, TEXT("Searchable closed event is missing"));
+        FGraphNodeCreator<UK2Node_ComponentBoundEvent> Creator(*ActorGraph);
+        auto* Event = Creator.CreateNode();
+        Event->InitializeComponentBoundEventParams(Property, Delegate); Creator.Finalize();
+        Event->NodePosX = 200; Event->NodePosY = 1700; Event->NodeComment = TEXT("Inspection.Closed");
+        auto* Completed = Add<UK2Node_IfThenElse>(ActorGraph, 650, 1700);
+        auto* HideAwareness = Call(ActorGraph, Base->GeneratedClass, TEXT("SetAwarenessVisible"), 950, 1700);
+        REQUIRE_SETUP(HideAwareness, SetupError);
+        HideAwareness->FindPinChecked(TEXT("IsVisible"))->DefaultValue = TEXT("false");
+        REQUIRE_SETUP(Link(Event->FindPinChecked(TEXT("then")), Completed->GetExecPin())
+            && Link(Event->FindPinChecked(TEXT("bCompleted")), Completed->GetConditionPin())
+            && Link(Completed->GetThenPin(), HideAwareness->GetExecPin()), SetupError);
+        UEdGraphPin* Exec = HideAwareness->GetThenPin();
+        int32 X = 1350;
+        for (FName Name : {FName(TEXT("Widget_InteractionPrompt")), FName(TEXT("Ring_Visual"))})
+        {
+            REQUIRE_SETUP(FindFProperty<FObjectProperty>(Blueprint->GeneratedClass, Name), TEXT("Indicator property missing: ") + Name.ToString());
+            FGraphNodeCreator<UK2Node_VariableGet> GetCreator(*ActorGraph);
+            auto* Get = GetCreator.CreateNode(); Get->VariableReference.SetSelfMember(Name); GetCreator.Finalize();
+            Get->NodePosX = X; Get->NodePosY = 1950;
+            auto* Hide = Call(ActorGraph, USceneComponent::StaticClass(), TEXT("SetHiddenInGame"), X, 1700, TEXT("Inspection.RetireIndicators"));
+            REQUIRE_SETUP(Hide, SetupError);
+            Hide->FindPinChecked(TEXT("NewHidden"))->DefaultValue = TEXT("true");
+            REQUIRE_SETUP(Link(Exec, Hide->GetExecPin()) && Link(Get->FindPinChecked(Name), Hide->FindPinChecked(TEXT("self"))), SetupError);
+            Exec = Hide->GetThenPin(); X += 400;
+        }
+    }
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+    REQUIRE_SETUP(SuccessJSON(CompileAndSave(Blueprint, false)), TEXT("Searchable actor compile failed"));
+    REQUIRE_SETUP(Save(Blueprint), TEXT("Could not save searchable actor"));
+    return TEXT("{\"success\":true,\"blueprints\":1}");
+}
+
 FString UInspectionEditorLibrary::FixInspectionPrompt()
 {
     using namespace InspectionSetup;

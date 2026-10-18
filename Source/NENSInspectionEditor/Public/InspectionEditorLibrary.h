@@ -5,6 +5,7 @@
 #include "InspectionEditorLibrary.generated.h"
 
 class UBlueprint;
+class UInspectionSceneData;
 
 /** Small editor-only bridge used by the reproducible inspection setup scripts. */
 UCLASS()
@@ -15,6 +16,9 @@ class NENSINSPECTIONEDITOR_API UInspectionEditorLibrary : public UBlueprintFunct
 public:
     UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
     static FString ConfigureInspection();
+    /** Connect an existing demo interactable to the shared inspection widget and scene data. */
+    UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
+    static FString ConfigureSearchableActor(UBlueprint* Blueprint, UInspectionSceneData* Scene);
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString ConfigureWiresMinigame();
     /** Prevent repeated prompt animations and retire completed wardrobe indicators. */

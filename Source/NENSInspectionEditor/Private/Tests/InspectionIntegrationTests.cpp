@@ -5,12 +5,14 @@
 #include "Editor.h"
 #include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
+#include "Engine/Texture2D.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Components/Image.h"
 #include "Blueprint/WidgetTree.h"
 #include "InspectionSubsystem.h"
 #include "InspectionSceneWidget.h"
@@ -85,7 +87,8 @@ public:
         if (Step == 0)
         {
             for (TActorIterator<AActor> It(World); It; ++It)
-                if (auto* C = It->FindComponentByClass<USearchableComponent>()) { Source = C; Wardrobe = *It; break; }
+                if (auto* C = It->FindComponentByClass<USearchableComponent>())
+                    if (C->Scene && C->Scene->GetFName() == TEXT("DA_Inspection_Wardrobe")) { Source = C; Wardrobe = *It; break; }
             if (!Test->TestNotNull(TEXT("Level contains configured wardrobe"), Source.Get())) return true;
             for (UActorComponent* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
             if (!Test->TestNotNull(TEXT("Existing BPC_Interaction found"), Interaction.Get())) return true;
@@ -209,6 +212,141 @@ private:
     TWeakObjectPtr<AActor> Wardrobe, Second;
     TWeakObjectPtr<UActorComponent> Interaction;
 };
+
+class FTableInspectionFlow : public IAutomationLatentCommand
+{
+public:
+    explicit FTableInspectionFlow(FAutomationTestBase* InTest) : Test(InTest), Started(FPlatformTime::Seconds()) {}
+    bool Update() override
+    {
+        const double Now = FPlatformTime::Seconds();
+        if (Now - Started > 60) { Test->AddError(TEXT("Table inspection timed out")); return true; }
+        if (bWatch && Table.IsValid())
+        {
+            for (FName Name : {FName(TEXT("Widget_InteractionPrompt")), FName(TEXT("Ring_Visual"))})
+            {
+                auto* Indicator = FindSceneComponent(Table.Get(), Name);
+                if (!Test->TestTrue(TEXT("Completed table indicators stay hidden across overlaps"), Indicator && Indicator->bHiddenInGame)) return true;
+            }
+        }
+        if (Now < Next) return false;
+        UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+        if (!World) { if (Step) { Test->AddError(TEXT("PIE stopped during table inspection")); return true; } return false; }
+        auto* PC = World->GetFirstPlayerController();
+        if (!PC || !PC->GetPawn() || !PC->GetLocalPlayer()) return false;
+        auto* Session = PC->GetLocalPlayer()->GetSubsystem<UInspectionSubsystem>();
+        if (Step == 0)
+        {
+            for (TActorIterator<AActor> It(World); It; ++It)
+                if (auto* C = It->FindComponentByClass<USearchableComponent>())
+                    if (C->Scene && C->Scene->GetFName() == TEXT("DA_Inspection_Table")) { Source = C; Table = *It; break; }
+            if (!Test->TestNotNull(TEXT("Existing table has inspection configured"), Source.Get())) return true;
+            for (auto* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
+            auto* Point = FindSceneComponent(Table.Get(), TEXT("InteractionPoint"));
+            if (!Test->TestNotNull(TEXT("Interaction component"), Interaction.Get()) || !Test->TestNotNull(TEXT("Table interaction point"), Point)) return true;
+            auto* Data = Source->Scene.Get();
+            FString Error;
+            if (!Test->TestTrue(TEXT("Table scene data validates"), Data->ValidateScene(Error))) { Test->AddError(Error); return true; }
+            if (!Test->TestEqual(TEXT("One note in table scene"), Data->Pickups.Num(), 1)) return true;
+            Test->TestEqual(TEXT("Table background canvas preserves source dimensions"), Data->CanvasSize, FVector2D(2001,1561));
+            Test->TestEqual(TEXT("Table uses supplied inspection background"), Data->Background->GetFName(), FName(TEXT("T_Inspection_Table")));
+            Test->TestEqual(TEXT("Pickup placement ID"), Data->Pickups[0].PickupID, FName(TEXT("Table_Note")));
+            Test->TestEqual(TEXT("Collected item type is Note"), Data->Pickups[0].ItemID, FName(TEXT("Note")));
+            Test->TestEqual(TEXT("Pickup uses supplied note texture"), Data->Pickups[0].Image->GetFName(), FName(TEXT("T_Note")));
+            Near = Point->GetComponentLocation(); Near.Z = PC->GetPawn()->GetActorLocation().Z;
+            PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
+            Step++; Next = Now + .5; return false;
+        }
+        auto* C = Source.Get();
+        if (!C) { Test->AddError(TEXT("Table source lost")); return true; }
+        switch (Step)
+        {
+        case 1:
+            Invoke(Interaction.Get(), TEXT("TryInteract"));
+            if (!Test->TestTrue(TEXT("E interaction route opens table inspection"), Session->IsOpen())) return true;
+            Test->TestEqual(TEXT("Inspection belongs to table"), Session->GetActiveSource(), C);
+            Test->TestTrue(TEXT("Table inspection shows cursor and blocks movement"), PC->bShowMouseCursor && PC->IsMoveInputIgnored());
+            Test->TestTrue(TEXT("Player stopped"), PC->GetPawn()->GetVelocity().IsNearlyZero());
+            Test->TestFalse(TEXT("Gameplay input blocked during inspection"), UInspectionBlueprintLibrary::IsInteractionInputAllowed(PC->GetPawn()));
+            break;
+        case 2:
+        {
+            auto* Widget = Session->GetActiveWidget();
+            if (!Test->TestEqual(TEXT("Uncollected note displayed"), Widget->GetPickupButtons().Num(), 1)) return true;
+            auto* Background = Cast<UImage>(Widget->WidgetTree->FindWidget(TEXT("Image_Background")));
+            Test->TestTrue(TEXT("Shared widget displays table background"), Background && Background->GetBrush().GetResourceObject() == C->Scene->Background);
+            const FVector2D DisplaySize = Widget->GetPickupButtons()[0]->GetCachedGeometry().GetLocalSize();
+            Test->TestTrue(TEXT("Note rendered with original proportions"), DisplaySize.Y > 0 && FMath::IsNearlyEqual(DisplaySize.X / DisplaySize.Y, 656.0 / 769.0, .001));
+            FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("TableInspection/table-open.png"), true, false);
+            break;
+        }
+        case 3:
+            Click(Session->GetActiveWidget(), FVector2D(.05,.05)); Key(EKeys::Escape);
+            Test->TestFalse(TEXT("Escape after background click closes table"), Session->IsOpen());
+            Test->TestFalse(TEXT("Leaving note uncollected keeps table incomplete"), C->IsComplete());
+            Test->TestTrue(TEXT("Unfinished table remains available"), UInspectionBlueprintLibrary::IsInteractionAvailable(Table.Get()));
+            Test->TestFalse(TEXT("Abort restores cursor and movement"), PC->bShowMouseCursor || PC->IsMoveInputIgnored());
+            break;
+        case 4:
+            Invoke(Interaction.Get(), TEXT("TryInteract"));
+            if (!Test->TestTrue(TEXT("Table reopens before collecting note"), Session->IsOpen())) return true;
+            Test->TestEqual(TEXT("Note still present on re-entry"), Session->GetActiveWidget()->GetPickupButtons().Num(), 1);
+            break;
+        case 5:
+            Test->TestTrue(TEXT("Actual mouse click on note"), Click(Session->GetActiveWidget()->GetPickupButtons()[0]));
+            if (!Test->TestTrue(TEXT("Note click completes table"), C->IsComplete())) return true;
+            Test->TestTrue(TEXT("Note collection recorded"), C->IsCollected(TEXT("Table_Note")));
+            Test->TestEqual(TEXT("Note hidden after collection"), Session->GetActiveWidget()->GetPickupButtons()[0]->GetVisibility(), ESlateVisibility::Collapsed);
+            Test->TestFalse(TEXT("Duplicate note collection rejected"), C->TryCollect(TEXT("Table_Note")));
+            Test->TestTrue(TEXT("Last pickup keeps inspection open"), Session->IsOpen());
+            FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("TableInspection/table-collected.png"), true, false);
+            break;
+        case 6:
+            Key(EKeys::Escape);
+            Test->TestFalse(TEXT("Escape after note click closes table"), Session->IsOpen());
+            Test->TestFalse(TEXT("Completed table is unavailable"), UInspectionBlueprintLibrary::IsInteractionAvailable(Table.Get()));
+            Test->TestFalse(TEXT("Completed table cannot open again"), Session->Open(C));
+            Test->TestFalse(TEXT("Controls restored after collection"), PC->bShowMouseCursor || PC->IsMoveInputIgnored());
+            bWatch = true;
+            PC->GetPawn()->SetActorLocation(Near + FVector(600,0,0), false, nullptr, ETeleportType::TeleportPhysics);
+            break;
+        case 7:
+            PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
+            Invoke(Interaction.Get(), TEXT("UpdateInteractionTarget"));
+            if (auto* P = FindFProperty<FObjectProperty>(Interaction->GetClass(), TEXT("CurrentInteractable")))
+                Test->TestNotEqual(TEXT("Completed table excluded from selection"), P->GetObjectPropertyValue_InContainer(Interaction.Get()), static_cast<UObject*>(Table.Get()));
+            { struct { bool Visible = true; } Args; Invoke(Table.Get(), TEXT("SetAwarenessVisible"), &Args); }
+            OtherActor = World->SpawnActor<AActor>(Table->GetClass(), FVector(5000,5000,0), FRotator::ZeroRotator);
+            if (!Test->TestNotNull(TEXT("Independent second table spawned"), OtherActor.Get())) return true;
+            Other = OtherActor->FindComponentByClass<USearchableComponent>();
+            if (!Test->TestNotNull(TEXT("Second table source"), Other.Get())) return true;
+            Test->TestFalse(TEXT("Second table has independent progress"), Other->IsComplete());
+            if (!Test->TestTrue(TEXT("Second table can open"), Session->Open(Other.Get()))) return true;
+            break;
+        case 8:
+            Test->TestEqual(TEXT("Second table still has its own note"), Session->GetActiveWidget()->GetPickupButtons().Num(), 1);
+            Key(EKeys::Escape);
+            PC->GetPawn()->SetActorLocation(Near + FVector(600,0,0), false, nullptr, ETeleportType::TeleportPhysics);
+            break;
+        case 9:
+            PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
+            Test->TestFalse(TEXT("Table furniture itself remains visible"), Table->IsHidden());
+            Test->TestTrue(TEXT("Gameplay input restored"), UInspectionBlueprintLibrary::IsInteractionInputAllowed(PC->GetPawn()));
+            OtherActor->Destroy();
+            return true;
+        }
+        Step++; Next = Now + .35; return false;
+    }
+private:
+    FAutomationTestBase* Test;
+    double Started, Next = 0;
+    int32 Step = 0;
+    bool bWatch = false;
+    FVector Near;
+    TWeakObjectPtr<AActor> Table, OtherActor;
+    TWeakObjectPtr<USearchableComponent> Source, Other;
+    TWeakObjectPtr<UActorComponent> Interaction;
+};
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInspectionPIETest, "NENS.Inspection.Integration.PIEWardrobe", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FInspectionPIETest::RunTest(const FString&)
@@ -217,6 +355,16 @@ bool FInspectionPIETest::RunTest(const FString&)
     ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
     ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(1.0f));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FInspectionFlow>(this));
+    ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTableInspectionPIETest, "NENS.Inspection.Integration.PIETable", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTableInspectionPIETest::RunTest(const FString&)
+{
+    FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/NENS/Maps/Tests/Walls/L_WallTest"));
+    ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+    ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(1.0f));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FTableInspectionFlow>(this));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     return true;
 }

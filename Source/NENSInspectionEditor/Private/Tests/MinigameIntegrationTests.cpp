@@ -20,6 +20,7 @@
 #include "MinigameWidget.h"
 #include "InteractionSessionSubsystem.h"
 #include "InspectionSubsystem.h"
+#include "InspectionSceneData.h"
 #include "InspectionBlueprintLibrary.h"
 #include "SearchableComponent.h"
 #include "UnrealClient.h"
@@ -100,7 +101,8 @@ public:
             for (TActorIterator<AActor> It(World); It; ++It)
             {
                 if (auto* C = It->FindComponentByClass<UMinigameComponent>()) { Source = C; Computer = *It; }
-                if (auto* C = It->FindComponentByClass<USearchableComponent>()) Wardrobe = C;
+                if (auto* C = It->FindComponentByClass<USearchableComponent>())
+                    if (C->Scene && C->Scene->GetFName() == TEXT("DA_Inspection_Wardrobe")) Wardrobe = C;
             }
             if (!Test->TestNotNull(TEXT("Configured computer on gameplay map"), Source.Get()) || !Test->TestNotNull(TEXT("Wardrobe for modal exclusion"), Wardrobe.Get())) return true;
             for (auto* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
