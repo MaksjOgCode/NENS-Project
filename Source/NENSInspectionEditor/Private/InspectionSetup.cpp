@@ -3,6 +3,8 @@
 #include "InspectionSceneData.h"
 #include "InspectionSceneWidget.h"
 #include "SearchableComponent.h"
+#include "MinigameComponent.h"
+#include "MinigameWidget.h"
 #include "BlueprintEditorLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -23,6 +25,7 @@
 #include "K2Node_CallFunction.h"
 #include "K2Node_ComponentBoundEvent.h"
 #include "K2Node_Event.h"
+#include "K2Node_CustomEvent.h"
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_IfThenElse.h"
 #include "K2Node_Self.h"
@@ -349,5 +352,104 @@ FString UInspectionEditorLibrary::FixInspectionPrompt()
     }
     REQUIRE_SETUP(Save(Prompt) && Save(Wardrobe), TEXT("Could not save prompt fix"));
     return TEXT("{\"success\":true,\"blueprints\":2,\"fix\":\"prompt-state-and-completion-visibility\"}");
+}
+FString UInspectionEditorLibrary::ConfigureWiresMinigame()
+{
+    using namespace InspectionSetup;
+    SetupError.Reset();
+    auto* Widget = LoadObject<UWidgetBlueprint>(nullptr, TEXT("/Game/Minigames/Wires/WBP_WiresMiniGame.WBP_WiresMiniGame"));
+    auto* Computer = LoadObject<UBlueprint>(nullptr, TEXT("/Game/NENS/Environment/Interior/Blueprints/BP_ComputerCabinet.BP_ComputerCabinet"));
+    auto* Base = LoadObject<UBlueprint>(nullptr, TEXT("/Game/NENS/Gameplay/Interaction/Blueprints/BP_InteractableBase.BP_InteractableBase"));
+    REQUIRE_SETUP(Widget && Computer && Base, TEXT("Wires widget, computer or interaction base is missing"));
+    Widget->Modify();
+    if (Widget->ParentClass != UMinigameWidget::StaticClass()) UBlueprintEditorLibrary::ReparentBlueprint(Widget, UMinigameWidget::StaticClass());
+    auto* CloseGraph = Graph(Widget, TEXT("CloseMiniGame"));
+    auto* EventGraph = Graph(Widget, TEXT("EventGraph"));
+    REQUIRE_SETUP(CloseGraph && EventGraph, TEXT("Wires CloseMiniGame/EventGraph missing"));
+    if (!HasMarker(CloseGraph, TEXT("Minigame.SessionClose")))
+    {
+        auto* Entry = Node(CloseGraph, TEXT("K2Node_FunctionEntry_0"));
+        REQUIRE_SETUP(Entry, TEXT("CloseMiniGame entry missing"));
+        auto* Request = Call(CloseGraph, UMinigameWidget::StaticClass(), TEXT("RequestClose"), 0, -300, TEXT("Minigame.SessionClose"));
+        Entry->FindPinChecked(TEXT("then"))->BreakAllPinLinks();
+        REQUIRE_SETUP(Link(Entry->FindPinChecked(TEXT("then")), Request->GetExecPin()), SetupError);
+    }
+    if (!HasMarker(EventGraph, TEXT("Minigame.ReportSuccess")))
+    {
+        UK2Node_CustomEvent* Win = nullptr;
+        for (UEdGraphNode* N : EventGraph->Nodes)
+            if (auto* E = Cast<UK2Node_CustomEvent>(N)) if (E->CustomFunctionName == TEXT("Win")) Win = E;
+        REQUIRE_SETUP(Win && Win->FindPinChecked(TEXT("then"))->LinkedTo.Num() == 1, TEXT("Wires Win event changed"));
+        auto* Status = Cast<UK2Node_CallFunction>(Win->FindPinChecked(TEXT("then"))->LinkedTo[0]->GetOwningNode());
+        REQUIRE_SETUP(Status && Status->FunctionReference.GetMemberName() == TEXT("SetText"), TEXT("Wires win status topology changed"));
+        auto* Exec = Status->GetThenPin();
+        TArray<UEdGraphPin*> Next = Exec->LinkedTo;
+        auto* Report = Call(EventGraph, UMinigameWidget::StaticClass(), TEXT("ReportSuccess"), Status->NodePosX + 300, Status->NodePosY + 200, TEXT("Minigame.ReportSuccess"));
+        Exec->BreakAllPinLinks();
+        REQUIRE_SETUP(Link(Exec, Report->GetExecPin()), SetupError);
+        for (auto* P : Next) REQUIRE_SETUP(Link(Report->GetThenPin(), P), SetupError);
+    }
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Widget);
+    REQUIRE_SETUP(SuccessJSON(CompileAndSave(Widget, false)), TEXT("Adapted wires widget compile failed"));
+    CastChecked<UMinigameWidget>(Widget->GeneratedClass->GetDefaultObject())->SetIsFocusable(true);
+
+    Computer->Modify();
+    USimpleConstructionScript* SCS = Computer->SimpleConstructionScript;
+    REQUIRE_SETUP(SCS, TEXT("Computer SCS missing"));
+    auto* ComponentNode = SCS->FindSCSNode(TEXT("Minigame"));
+    if (!ComponentNode) { ComponentNode = SCS->CreateNode(UMinigameComponent::StaticClass(), TEXT("Minigame")); SCS->AddNode(ComponentNode); }
+    auto* Component = Cast<UMinigameComponent>(ComponentNode->ComponentTemplate);
+    REQUIRE_SETUP(Component, TEXT("Minigame name belongs to another component"));
+    Component->WidgetClass = Widget->GeneratedClass;
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Computer);
+    REQUIRE_SETUP(SuccessJSON(CompileAndSave(Computer, false)), TEXT("Computer component compile failed"));
+    auto* CG = Graph(Computer, TEXT("EventGraph"));
+    REQUIRE_SETUP(CG, TEXT("Computer EventGraph missing"));
+    if (!HasMarker(CG, TEXT("Minigame.Open")))
+    {
+        UK2Node_Event* Interact = nullptr;
+        for (UEdGraphNode* N : CG->Nodes)
+            if (auto* E = Cast<UK2Node_Event>(N)) if (E->EventReference.GetMemberName() == TEXT("Interact")) Interact = E;
+        REQUIRE_SETUP(Interact, TEXT("Computer Interact event missing"));
+        for (auto* P : Interact->FindPinChecked(TEXT("then"))->LinkedTo)
+        {
+            auto* Old = Cast<UK2Node_CallFunction>(P->GetOwningNode());
+            REQUIRE_SETUP(Old && Old->FunctionReference.GetMemberName() == TEXT("PrintString"), TEXT("Computer has non-demo interaction logic; refusing to replace"));
+        }
+        auto* Open = Call(CG, UInspectionBlueprintLibrary::StaticClass(), TEXT("OpenMinigame"), 650, 1200, TEXT("Minigame.Open"));
+        auto* Self = Add<UK2Node_Self>(CG, 400, 1400);
+        Interact->FindPinChecked(TEXT("then"))->BreakAllPinLinks();
+        REQUIRE_SETUP(Link(Interact->FindPinChecked(TEXT("then")), Open->GetExecPin())
+            && Link(Interact->FindPinChecked(TEXT("Interactor")), Open->FindPinChecked(TEXT("Interactor")))
+            && Link(Self->FindPinChecked(TEXT("self")), Open->FindPinChecked(TEXT("Target"))), SetupError);
+    }
+    if (!HasMarker(CG, TEXT("Minigame.Closed")))
+    {
+        auto* Property = FindFProperty<FObjectProperty>(Computer->GeneratedClass, TEXT("Minigame"));
+        auto* Delegate = FindFProperty<FMulticastDelegateProperty>(UMinigameComponent::StaticClass(), TEXT("OnMinigameClosed"));
+        REQUIRE_SETUP(Property && Delegate, TEXT("Minigame component closed event missing"));
+        FGraphNodeCreator<UK2Node_ComponentBoundEvent> Creator(*CG);
+        auto* Event = Creator.CreateNode(); Event->InitializeComponentBoundEventParams(Property, Delegate); Creator.Finalize();
+        Event->NodePosX = 200; Event->NodePosY = 1700; Event->NodeComment = TEXT("Minigame.Closed");
+        auto* Completed = Add<UK2Node_IfThenElse>(CG, 600, 1700);
+        auto* Hide = Call(CG, Base->GeneratedClass, TEXT("SetAwarenessVisible"), 900, 1700);
+        Hide->FindPinChecked(TEXT("IsVisible"))->DefaultValue = TEXT("false");
+        REQUIRE_SETUP(Link(Event->FindPinChecked(TEXT("then")), Completed->GetExecPin()) && Link(Event->FindPinChecked(TEXT("bCompleted")), Completed->GetConditionPin()) && Link(Completed->GetThenPin(), Hide->GetExecPin()), SetupError);
+        UEdGraphPin* Exec = Hide->GetThenPin();
+        int32 X = 1300;
+        for (FName Name : {FName(TEXT("Widget_InteractionPrompt")), FName(TEXT("Ring_Visual"))})
+        {
+            FGraphNodeCreator<UK2Node_VariableGet> GetCreator(*CG);
+            auto* Get = GetCreator.CreateNode(); Get->VariableReference.SetSelfMember(Name); GetCreator.Finalize(); Get->NodePosX = X; Get->NodePosY = 1950;
+            auto* Hidden = Call(CG, USceneComponent::StaticClass(), TEXT("SetHiddenInGame"), X, 1700);
+            Hidden->FindPinChecked(TEXT("NewHidden"))->DefaultValue = TEXT("true");
+            REQUIRE_SETUP(Link(Exec, Hidden->GetExecPin()) && Link(Get->FindPinChecked(Name), Hidden->FindPinChecked(TEXT("self"))), SetupError);
+            Exec = Hidden->GetThenPin(); X += 400;
+        }
+    }
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Computer);
+    REQUIRE_SETUP(SuccessJSON(CompileAndSave(Computer, false)), TEXT("Computer integration compile failed"));
+    REQUIRE_SETUP(Save(Widget) && Save(Computer), TEXT("Could not save wires integration"));
+    return TEXT("{\"success\":true,\"blueprints\":2,\"levels_modified\":0}");
 }
 #undef REQUIRE_SETUP

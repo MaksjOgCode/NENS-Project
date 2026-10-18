@@ -15,12 +15,16 @@ class NENSINSPECTIONEDITOR_API UInspectionEditorLibrary : public UBlueprintFunct
 public:
     UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
     static FString ConfigureInspection();
+    UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
+    static FString ConfigureWiresMinigame();
     /** Prevent repeated prompt animations and retire completed wardrobe indicators. */
     UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
     static FString FixInspectionPrompt();
     /** Read-only graph, component-template, default-property and widget-tree audit. */
     UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
     static FString DumpBlueprint(UBlueprint* Blueprint);
+    UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
+    static FString DumpLevel(const FString& AssetPath);
 
     /** Compile first; save only if compilation succeeds. Returns JSON diagnostics. */
     UFUNCTION(BlueprintCallable, Category="Inspection|Editor")

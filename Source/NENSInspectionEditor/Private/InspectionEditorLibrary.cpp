@@ -11,6 +11,10 @@
 #include "EdGraph/EdGraphPin.h"
 #include "Engine/Blueprint.h"
 #include "Engine/BlueprintGeneratedClass.h"
+#include "Engine/World.h"
+#include "Engine/Level.h"
+#include "Engine/LevelScriptBlueprint.h"
+#include "GameFramework/Actor.h"
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
 #include "K2Node_CallFunction.h"
@@ -258,5 +262,27 @@ FString UInspectionEditorLibrary::CompileAndSave(UBlueprint* Blueprint, bool bSa
     Result->SetBoolField(TEXT("compiled"), bCompiled);
     Result->SetBoolField(TEXT("saved"), bSaved);
     Result->SetBoolField(TEXT("success"), bCompiled && (!bSave || bSaved));
+    return InspectionEditor::Serialize(Result);
+}
+
+FString UInspectionEditorLibrary::DumpLevel(const FString& AssetPath)
+{
+    using namespace InspectionEditor;
+    auto Result = MakeShared<FJsonObject>();
+    UWorld* World = LoadObject<UWorld>(nullptr, *AssetPath);
+    Result->SetBoolField(TEXT("loaded"), World != nullptr);
+    if (World && World->PersistentLevel)
+    {
+        if (auto* BP = World->PersistentLevel->GetLevelScriptBlueprint(true))
+        {
+            TSharedPtr<FJsonObject> Script;
+            FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(DumpBlueprint(BP)), Script);
+            Result->SetObjectField(TEXT("level_script"), Script);
+        }
+        TArray<TSharedPtr<FJsonValue>> Actors;
+        for (AActor* Actor : World->PersistentLevel->Actors)
+            if (Actor) Actors.Add(MakeShared<FJsonValueObject>(ObjectDescription(Actor)));
+        Result->SetArrayField(TEXT("actors"), Actors);
+    }
     return InspectionEditor::Serialize(Result);
 }

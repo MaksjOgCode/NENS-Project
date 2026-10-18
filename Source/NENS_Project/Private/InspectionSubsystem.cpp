@@ -2,12 +2,9 @@
 #include "InspectionSceneWidget.h"
 #include "InspectionSceneData.h"
 #include "SearchableComponent.h"
-#include "Blueprint/WidgetBlueprintLibrary.h"
+#include "InteractionSessionSubsystem.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
-#include "GameFramework/PlayerInput.h"
-#include "GameFramework/Pawn.h"
-#include "GameFramework/PawnMovementComponent.h"
 
 bool UInspectionSubsystem::Open(USearchableComponent* Source)
 {
@@ -20,46 +17,32 @@ bool UInspectionSubsystem::Open(USearchableComponent* Source)
     }
     APlayerController* PC = GetLocalPlayer()->GetPlayerController(GetWorld());
     if (!PC || !PC->IsLocalController() || Source->GetWorld() != PC->GetWorld()) return false;
+    auto* Session = GetLocalPlayer()->GetSubsystem<UInteractionSessionSubsystem>();
+    if (!Session || Session->IsOpen()) return false;
     UClass* WidgetClass = Source->SceneWidgetClass;
     if (!WidgetClass) return false;
     auto* Widget = CreateWidget<UInspectionSceneWidget>(PC, WidgetClass);
     if (!Widget || !Widget->Configure(Source, this)) return false;
-    if (!Widget->AddToPlayerScreen(100)) return false;
-
     ActiveSource = Source;
-    SessionController = PC;
     ActiveWidget = Widget;
-    bPreviousCursor = PC->bShowMouseCursor;
-    Source->GetOwner()->OnEndPlay.AddDynamic(this, &ThisClass::SourceEnded);
-    if (APawn* Pawn = PC->GetPawn())
+    ActiveSession = Session;
+    if (!Session->Open(Widget, Source->GetOwner(), FSimpleDelegate::CreateUObject(this, &ThisClass::SessionClosed)))
     {
-        Pawn->ConsumeMovementInputVector();
-        if (auto* Movement = Pawn->GetMovementComponent()) Movement->StopMovementImmediately();
+        ActiveWidget = nullptr; ActiveSource.Reset(); ActiveSession.Reset(); return false;
     }
-    PC->SetIgnoreMoveInput(true);
-    PC->SetIgnoreLookInput(true);
-    PC->bShowMouseCursor = true;
-    UWidgetBlueprintLibrary::SetInputMode_UIOnlyEx(PC, Widget, EMouseLockMode::DoNotLock, true);
-    Widget->SetUserFocus(PC);
     return true;
 }
 void UInspectionSubsystem::Close()
 {
     if (!ActiveWidget) return;
+    if (auto* Session = ActiveSession.Get()) Session->Close(ActiveWidget);
+}
+void UInspectionSubsystem::SessionClosed()
+{
     USearchableComponent* Source = ActiveSource.Get();
-    if (Source && Source->GetOwner()) Source->GetOwner()->OnEndPlay.RemoveDynamic(this, &ThisClass::SourceEnded);
-    ActiveWidget->RemoveFromParent();
     ActiveWidget = nullptr;
     ActiveSource.Reset();
-    if (APlayerController* PC = SessionController.Get())
-    {
-        PC->SetIgnoreMoveInput(false);
-        PC->SetIgnoreLookInput(false);
-        PC->bShowMouseCursor = bPreviousCursor;
-        UWidgetBlueprintLibrary::SetInputMode_GameOnly(PC, true);
-    }
-    SessionController.Reset();
+    ActiveSession.Reset();
     if (IsValid(Source)) Source->NotifyInspectionClosed();
 }
-void UInspectionSubsystem::SourceEnded(AActor*, EEndPlayReason::Type) { Close(); }
 void UInspectionSubsystem::Deinitialize() { Close(); Super::Deinitialize(); }

@@ -5,6 +5,7 @@
 class USearchableComponent;
 class UInspectionSceneWidget;
 class APlayerController;
+class UInteractionSessionSubsystem;
 
 /** Owns the single modal inspection for this local player. */
 UCLASS()
@@ -21,7 +22,6 @@ public:
 private:
     UPROPERTY(Transient) TObjectPtr<UInspectionSceneWidget> ActiveWidget;
     UPROPERTY(Transient) TWeakObjectPtr<USearchableComponent> ActiveSource;
-    UPROPERTY(Transient) TWeakObjectPtr<APlayerController> SessionController;
-    bool bPreviousCursor = false;
-    UFUNCTION() void SourceEnded(AActor* Actor, EEndPlayReason::Type Reason);
+    UPROPERTY(Transient) TWeakObjectPtr<UInteractionSessionSubsystem> ActiveSession;
+    void SessionClosed();
 };

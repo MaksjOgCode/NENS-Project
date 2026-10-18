@@ -39,10 +39,12 @@
 ## Код и интеграция
 
 - Runtime-модуль `NENS_Project`: `InspectionSceneData`, `SearchableComponent`, `InspectionSubsystem`, `InspectionSceneWidget`, `InspectionPickupButton`, `InspectionBlueprintLibrary`.
-- `InspectionSubsystem` принадлежит локальному игроку и допускает один активный экран; останавливает движение, включает UI-only input, восстанавливает управление при закрытии и уничтожении владельца.
+- `InspectionSubsystem` принадлежит локальному игроку и управляет осмотром. После подключения мини-игр он передаёт владение окном и переключение ввода общему `InteractionSessionSubsystem`: тот не допускает одновременный осмотр и мини-игру, останавливает движение, включает UI-only input и восстанавливает управление при закрытии/уничтожении владельца.
 - Общие изменения Blueprint: проверки доступности в `BPC_Interaction.UpdateInteractionTarget`, `TryInteract` и `BP_InteractableBase.SetAwarenessVisible`. Расстояния, материалы, размеры подсказок и движение персонажа сохранены.
 - `WBP_InteractionPrompt.SetPromptFocused` запоминает желаемое состояние. Повторный запрос того же состояния не перезапускает анимацию: иначе повторный `Play Animation Reverse` после завершения заново делает E видимой на время обратного проигрывания.
 - Editor-модуль `NENSInspectionEditor` и Python нужны только для настройки/проверок. Runtime не зависит от них. Ссылка на класс WBP хранится в компоненте и доступна сборщику ресурсов.
+
+Подключение компьютера и проводов описано в [MinigameIntegration.md](MinigameIntegration.md). `SearchableComponent` продолжает хранить собранные предметы; завершение мини-игры хранится отдельно в `MinigameComponent`.
 
 ## Сборка и проверки
 
