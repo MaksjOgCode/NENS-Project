@@ -4,7 +4,13 @@
 	"Category": "Games",
 	"Description": "Minimal desktop Forward + SMAA + Bloom starter",
 	"DisableEnginePluginsByDefault": true,
+	"Modules": [
+		{ "Name": "NENS_Project", "Type": "Runtime", "LoadingPhase": "Default" },
+		{ "Name": "NENSInspectionEditor", "Type": "Editor", "LoadingPhase": "Default" }
+	],
 	"Plugins": [
+		{ "Name": "PythonScriptPlugin", "Enabled": true, "TargetAllowList": ["Editor"] },
+		{ "Name": "EditorScriptingUtilities", "Enabled": true, "TargetAllowList": ["Editor"] },
 		{
 			"Name": "PluginBrowser",
 			"Enabled": true,
