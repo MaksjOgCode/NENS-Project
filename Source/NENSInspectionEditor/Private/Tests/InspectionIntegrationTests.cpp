@@ -213,6 +213,101 @@ private:
     TWeakObjectPtr<UActorComponent> Interaction;
 };
 
+class FGoslingInspectionFlow : public IAutomationLatentCommand
+{
+public:
+    explicit FGoslingInspectionFlow(FAutomationTestBase* InTest) : Test(InTest), Started(FPlatformTime::Seconds()) {}
+    bool Update() override
+    {
+        const double Now = FPlatformTime::Seconds();
+        if (Now - Started > 60) { Test->AddError(TEXT("Gosling inspection timed out")); return true; }
+        if (Now < Next) return false;
+        UWorld* World = GEditor ? GEditor->PlayWorld : nullptr;
+        if (!World) { if (Step) { Test->AddError(TEXT("PIE stopped during Gosling inspection")); return true; } return false; }
+        auto* PC = World->GetFirstPlayerController();
+        if (!PC || !PC->GetPawn() || !PC->GetLocalPlayer()) return false;
+        auto* Session = PC->GetLocalPlayer()->GetSubsystem<UInspectionSubsystem>();
+        if (Step == 0)
+        {
+            for (TActorIterator<AActor> It(World); It; ++It)
+                if (auto* C = It->FindComponentByClass<USearchableComponent>())
+                    if (C->Scene && C->Scene->GetFName() == TEXT("DA_Inspection_Gosling")) { Source = C; Picture = *It; break; }
+            if (!Test->TestNotNull(TEXT("Placed Gosling picture has inspection configured"), Source.Get())) return true;
+            for (auto* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
+            auto* Point = FindSceneComponent(Picture.Get(), TEXT("InteractionPoint"));
+            if (!Test->TestNotNull(TEXT("Picture interaction point"), Point) || !Test->TestNotNull(TEXT("Existing interaction component"), Interaction.Get())) return true;
+            Test->TestEqual(TEXT("Hint scene contains no pickups"), Source->Scene->Pickups.Num(), 0);
+            Test->TestEqual(TEXT("Portrait canvas preserves original dimensions"), Source->Scene->CanvasSize, FVector2D(2480,3508));
+            Test->TestFalse(TEXT("Empty hint never counts as complete"), Source->IsComplete());
+            Test->TestFalse(TEXT("Hint has nothing collectible"), Source->TryCollect(TEXT("NonexistentPickup")));
+            Near = Point->GetComponentLocation(); Near.Z = PC->GetPawn()->GetActorLocation().Z;
+            PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
+            Step++; Next = Now + .5; return false;
+        }
+        switch (Step)
+        {
+        case 1:
+            Invoke(Interaction.Get(), TEXT("TryInteract"));
+            if (!Test->TestTrue(TEXT("E interaction opens Gosling art on every visit"), Session->IsOpen())) return true;
+            if (!Test->TestEqual(TEXT("Inspection belongs to picture"), Session->GetActiveSource(), Source.Get())) return true;
+            Test->TestTrue(TEXT("Art shows cursor and blocks movement"), PC->bShowMouseCursor && PC->IsMoveInputIgnored());
+            Test->TestFalse(TEXT("Gameplay input blocked while art open"), UInspectionBlueprintLibrary::IsInteractionInputAllowed(PC->GetPawn()));
+            break;
+        case 2:
+        {
+            auto* Widget = Session->GetActiveWidget();
+            if (!Test->TestNotNull(TEXT("Picture inspection widget"), Widget)) return true;
+            Test->TestEqual(TEXT("No pickup buttons in picture inspection"), Widget->GetPickupButtons().Num(), 0);
+            auto* Background = Cast<UImage>(Widget->WidgetTree->FindWidget(TEXT("Image_Background")));
+            Test->TestTrue(TEXT("Shared widget displays Gosling art"), Background && Background->GetBrush().GetResourceObject() == Source->Scene->Background);
+            if (Background)
+            {
+                const FVector2D Size = Background->GetCachedGeometry().GetLocalSize();
+                Test->TestTrue(TEXT("Portrait is displayed without aspect distortion"), Size.Y > 0 && FMath::IsNearlyEqual(Size.X / Size.Y, 2480.0 / 3508.0, .001));
+            }
+            if (Visits == 0) FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("GoslingInspection/gosling-open.png"), true, false);
+            break;
+        }
+        case 3:
+            Test->TestTrue(TEXT("Art click routed without collecting anything"), Click(Session->GetActiveWidget(), FVector2D(.5,.5)));
+            Key(EKeys::Escape);
+            Test->TestFalse(TEXT("Escape after art click closes inspection"), Session->IsOpen());
+            Test->TestFalse(TEXT("Picture remains incomplete after viewing"), Source->IsComplete());
+            Test->TestTrue(TEXT("Picture remains available after viewing"), UInspectionBlueprintLibrary::IsInteractionAvailable(Picture.Get()));
+            Test->TestFalse(TEXT("Closing art restores cursor and movement"), PC->bShowMouseCursor || PC->IsMoveInputIgnored());
+            for (FName Name : {FName(TEXT("Widget_InteractionPrompt")), FName(TEXT("Ring_Visual"))})
+            {
+                auto* Indicator = FindSceneComponent(Picture.Get(), Name);
+                if (!Test->TestTrue(TEXT("Viewing art never retires picture indicators"), Indicator && !Indicator->bHiddenInGame)) return true;
+            }
+            break;
+        case 4:
+            PC->GetPawn()->SetActorLocation(Near + FVector(600,0,0), false, nullptr, ETeleportType::TeleportPhysics);
+            break;
+        case 5:
+            PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
+            Step++; Next = Now + 1.2; return false;
+        case 6:
+            if (auto* Ring = FindSceneComponent(Picture.Get(), TEXT("Ring_Visual"))) Test->TestTrue(TEXT("Picture ring reappears after leaving and returning"), Ring->IsVisible());
+            if (auto* P = FindFProperty<FObjectProperty>(Picture->GetClass(), TEXT("RingMID")))
+                Test->TestNotNull(TEXT("Inherited BeginPlay initializes picture ring material"), P->GetObjectPropertyValue_InContainer(Picture.Get()));
+            Test->TestFalse(TEXT("Picture actor remains visible"), Picture->IsHidden());
+            if (++Visits < 3) { Step = 1; Next = Now + .2; return false; }
+            Test->TestTrue(TEXT("Gameplay input restored after repeated viewing"), UInspectionBlueprintLibrary::IsInteractionInputAllowed(PC->GetPawn()));
+            return true;
+        }
+        Step++; Next = Now + .35; return false;
+    }
+private:
+    FAutomationTestBase* Test;
+    double Started, Next = 0;
+    int32 Step = 0, Visits = 0;
+    FVector Near;
+    TWeakObjectPtr<USearchableComponent> Source;
+    TWeakObjectPtr<AActor> Picture;
+    TWeakObjectPtr<UActorComponent> Interaction;
+};
+
 class FTableInspectionFlow : public IAutomationLatentCommand
 {
 public:
@@ -365,6 +460,16 @@ bool FTableInspectionPIETest::RunTest(const FString&)
     ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
     ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(1.0f));
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FTableInspectionFlow>(this));
+    ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGoslingInspectionPIETest, "NENS.Inspection.Integration.PIEGosling", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FGoslingInspectionPIETest::RunTest(const FString&)
+{
+    FAutomationEditorCommonUtils::LoadMap(TEXT("/Game/NENS/Maps/Tests/Walls/L_WallTest"));
+    ADD_LATENT_AUTOMATION_COMMAND(FStartPIECommand(false));
+    ADD_LATENT_AUTOMATION_COMMAND(FWaitLatentCommand(1.0f));
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FGoslingInspectionFlow>(this));
     ADD_LATENT_AUTOMATION_COMMAND(FEndPlayMapCommand());
     return true;
 }
