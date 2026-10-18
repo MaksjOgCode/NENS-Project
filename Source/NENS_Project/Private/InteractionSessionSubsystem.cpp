@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "Framework/Application/SlateApplication.h"
 
 bool UInteractionSessionSubsystem::Open(UUserWidget* Widget, AActor* Owner, FSimpleDelegate Closed)
 {
@@ -42,6 +43,8 @@ void UInteractionSessionSubsystem::Close(UUserWidget* ExpectedWidget)
     // Clear ownership before RemoveFromParent, which can trigger widget Destruct.
     ActiveWidget = nullptr;
     ActiveOwner.Reset();
+    // A captured drag can keep routing mouse events to a removed modal. Release it before removal.
+    if (ClosingWidget->HasMouseCapture() && FSlateApplication::IsInitialized()) FSlateApplication::Get().ReleaseAllPointerCapture();
     ClosingWidget->StopAnimationsAndLatentActions();
     ClosingWidget->RemoveFromParent();
     if (auto* PC = SessionController.Get())

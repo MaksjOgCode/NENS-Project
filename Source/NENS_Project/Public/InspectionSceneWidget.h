@@ -29,7 +29,7 @@ class NENS_PROJECT_API UInspectionSceneWidget : public UUserWidget
     GENERATED_BODY()
 public:
     UInspectionSceneWidget(const FObjectInitializer& ObjectInitializer);
-    bool Configure(USearchableComponent* Source, UInspectionSubsystem* Session);
+    virtual bool Configure(USearchableComponent* Source, UInspectionSubsystem* Session);
     UFUNCTION(BlueprintCallable, Category="Inspection") bool CollectPickup(FName PickupID);
     const TArray<TObjectPtr<UInspectionPickupButton>>& GetPickupButtons() const { return PickupButtons; }
 protected:

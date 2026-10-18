@@ -21,6 +21,8 @@ public:
     static FString ConfigureSearchableActor(UBlueprint* Blueprint, UInspectionSceneData* Scene);
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString ConfigureWiresMinigame();
+    UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
+    static FString ConfigureClockInspection();
     /** Prevent repeated prompt animations and retire completed wardrobe indicators. */
     UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
     static FString FixInspectionPrompt();

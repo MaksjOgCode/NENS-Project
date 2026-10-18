@@ -5,6 +5,9 @@
 #include "SearchableComponent.h"
 #include "MinigameComponent.h"
 #include "MinigameWidget.h"
+#include "ClockInspectionComponent.h"
+#include "ClockInspectionWidget.h"
+#include "ClockPuzzleData.h"
 #include "BlueprintEditorLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
@@ -363,6 +366,36 @@ FString UInspectionEditorLibrary::ConfigureSearchableActor(UBlueprint* Blueprint
     REQUIRE_SETUP(SuccessJSON(CompileAndSave(Blueprint, false)), TEXT("Searchable actor compile failed"));
     REQUIRE_SETUP(Save(Blueprint), TEXT("Could not save searchable actor"));
     return TEXT("{\"success\":true,\"blueprints\":1}");
+}
+
+FString UInspectionEditorLibrary::ConfigureClockInspection()
+{
+    using namespace InspectionSetup;
+    auto* Clock = LoadObject<UBlueprint>(nullptr, TEXT("/Game/NENS/Environment/Interior/Blueprints/BP_FloorClock.BP_FloorClock"));
+    auto* Scene = LoadObject<UInspectionSceneData>(nullptr, TEXT("/Game/NENS/UI/Inspection/DA_Inspection_FloorClock.DA_Inspection_FloorClock"));
+    auto* Puzzle = LoadObject<UClockPuzzleData>(nullptr, TEXT("/Game/NENS/UI/Inspection/DA_ClockPuzzle_FloorClock.DA_ClockPuzzle_FloorClock"));
+    auto* Widget = LoadObject<UWidgetBlueprint>(nullptr, TEXT("/Game/NENS/UI/Inspection/WBP_ClockInspection.WBP_ClockInspection"));
+    REQUIRE_SETUP(Clock && Scene && Puzzle && Widget, TEXT("Clock setup assets missing"));
+    FString Error;
+    REQUIRE_SETUP(Puzzle->Validate(Error) && Scene->ValidateScene(Error), Error);
+    if (Widget->ParentClass != UClockInspectionWidget::StaticClass()) UBlueprintEditorLibrary::ReparentBlueprint(Widget, UClockInspectionWidget::StaticClass());
+    REQUIRE_SETUP(SuccessJSON(CompileAndSave(Widget, false)), TEXT("Clock widget compile failed"));
+    Clock->Modify();
+    USimpleConstructionScript* SCS = Clock->SimpleConstructionScript;
+    REQUIRE_SETUP(SCS, TEXT("Clock SCS missing"));
+    auto* Node = SCS->FindSCSNode(TEXT("Searchable"));
+    if (!Node) { Node = SCS->CreateNode(UClockInspectionComponent::StaticClass(), TEXT("Searchable")); SCS->AddNode(Node); }
+    auto* Component = Cast<UClockInspectionComponent>(Node->ComponentTemplate);
+    REQUIRE_SETUP(Component, TEXT("Clock already has a different Searchable component; refusing to replace"));
+    Component->Puzzle = Puzzle;
+    const FString SharedSetup = ConfigureSearchableActor(Clock, Scene);
+    REQUIRE_SETUP(SuccessJSON(SharedSetup), SharedSetup);
+    Component->SceneWidgetClass = Widget->GeneratedClass;
+    REQUIRE_SETUP(Component->ValidateSetup(Error), Error);
+    FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Clock);
+    REQUIRE_SETUP(SuccessJSON(CompileAndSave(Clock, false)), TEXT("Clock actor compile failed"));
+    REQUIRE_SETUP(Save(Widget) && Save(Clock), TEXT("Clock save failed"));
+    return TEXT("{\"success\":true,\"blueprints\":2,\"levels_modified\":0}");
 }
 
 FString UInspectionEditorLibrary::FixInspectionPrompt()

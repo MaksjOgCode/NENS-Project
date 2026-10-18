@@ -42,7 +42,7 @@ public:
     bool IsCollected(FName PickupID) const;
 
     UFUNCTION(BlueprintCallable, Category="Inspection")
-    bool TryCollect(FName PickupID);
+    virtual bool TryCollect(FName PickupID);
 
     UFUNCTION(BlueprintCallable, Category="Inspection")
     void OpenInspection(AActor* Interactor);
