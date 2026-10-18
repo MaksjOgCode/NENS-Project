@@ -166,8 +166,8 @@ public:
             if (!Test->TestNotNull(TEXT("Computer opens after inspection"), SourceNow->GetActiveWidget())) return true;
             break;
         case 8:
-            for (int32 Pair = 0; Pair < 4; ++Pair) Connect(SourceNow->GetActiveWidget(), Pair);
-            Test->TestEqual(TEXT("Original puzzle records four connected pairs"), ReadInt(SourceNow->GetActiveWidget(), TEXT("ConnectedCount")), 4);
+            for (int32 Pair = 0; Pair < 3; ++Pair) Connect(SourceNow->GetActiveWidget(), Pair);
+            Test->TestEqual(TEXT("Updated puzzle records three connected pairs"), ReadInt(SourceNow->GetActiveWidget(), TEXT("ConnectedCount")), 3);
             if (!Test->TestTrue(TEXT("Win reports success to computer"), SourceNow->IsComplete())) return true;
             Test->TestTrue(TEXT("Success screen remains for original delay"), Shared->IsOpen());
             PreviousAttempt.Reset(SourceNow->GetActiveWidget());
@@ -251,8 +251,8 @@ public:
         }
         else if (Step == 1)
         {
-            for (int32 Pair = 0; Pair < 4; ++Pair) Connect(Widget.Get(), Pair);
-            Test->TestEqual(TEXT("Standalone original puzzle can be won"), ReadInt(Widget.Get(), TEXT("ConnectedCount")), 4);
+            for (int32 Pair = 0; Pair < 3; ++Pair) Connect(Widget.Get(), Pair);
+            Test->TestEqual(TEXT("Standalone updated puzzle can be won"), ReadInt(Widget.Get(), TEXT("ConnectedCount")), 3);
             Test->TestTrue(TEXT("Standalone success reported"), Widget->HasReportedSuccess());
             Step++; Next = Now + 1.5; return false;
         }
