@@ -1,0 +1,308 @@
+[
+  {
+    "source": "SourceArt/Props/T_Props_MetalShelf_Front.png",
+    "original": "T_Proops_Metall_Shelf_Front.png",
+    "name": "MetalShelf_Front",
+    "axis": "width",
+    "world_size": 300,
+    "texture_size": [
+      3309,
+      1434
+    ],
+    "bounds": [
+      80,
+      128,
+      3228,
+      1329
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_MetalShelf_Side.png",
+    "original": "T_Proops_Metall_Shelf_Side.png",
+    "name": "MetalShelf_Side",
+    "axis": "height",
+    "world_size": 280,
+    "texture_size": [
+      1245,
+      3008
+    ],
+    "bounds": [
+      0,
+      138,
+      1245,
+      3008
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Notes.png",
+    "original": "T_Proops_Notes.PNG",
+    "name": "Notes",
+    "axis": "width",
+    "world_size": 24,
+    "texture_size": [
+      1000,
+      1000
+    ],
+    "bounds": [
+      174,
+      258,
+      842,
+      736
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Pillar.png",
+    "original": "T_Proops_Pillar.png",
+    "name": "Pillar",
+    "axis": "height",
+    "world_size": 140,
+    "texture_size": [
+      1000,
+      1000
+    ],
+    "bounds": [
+      325,
+      0,
+      663,
+      949
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_TypewriterDesk.png",
+    "original": "T_Proops_Printing_Desk.png",
+    "name": "TypewriterDesk",
+    "axis": "width",
+    "world_size": 115,
+    "texture_size": [
+      711,
+      681
+    ],
+    "bounds": [
+      34,
+      32,
+      671,
+      639
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_CrumpledPaper.png",
+    "original": "T_Proops_Rubbish_0.PNG",
+    "name": "CrumpledPaper",
+    "axis": "width",
+    "world_size": 30,
+    "texture_size": [
+      1000,
+      1000
+    ],
+    "bounds": [
+      225,
+      256,
+      681,
+      780
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Pen.png",
+    "original": "T_Proops_Rubbish_1.PNG",
+    "name": "Pen",
+    "axis": "height",
+    "world_size": 22,
+    "texture_size": [
+      1000,
+      1000
+    ],
+    "bounds": [
+      115,
+      163,
+      833,
+      795
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Sofa_Front.png",
+    "original": "T_Proops_Sofa.png",
+    "name": "Sofa_Front",
+    "axis": "width",
+    "world_size": 160,
+    "texture_size": [
+      2480,
+      3508
+    ],
+    "bounds": [
+      361,
+      1547,
+      2119,
+      2471
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Sofa_Corner.png",
+    "original": "T_Proops_SIdeSofa.png",
+    "name": "Sofa_Corner",
+    "axis": "width",
+    "world_size": 160,
+    "texture_size": [
+      1216,
+      1441
+    ],
+    "bounds": [
+      3,
+      56,
+      1175,
+      1418
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Sofa_Back.png",
+    "original": "T_Proops_SofaBack.png",
+    "name": "Sofa_Back",
+    "axis": "width",
+    "world_size": 120,
+    "texture_size": [
+      1456,
+      1456
+    ],
+    "bounds": [
+      318,
+      416,
+      1138,
+      1074
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Stairs.png",
+    "original": "T_Proops_Stairs.png",
+    "name": "Stairs",
+    "axis": "width",
+    "world_size": 64,
+    "texture_size": [
+      500,
+      500
+    ],
+    "bounds": [
+      0,
+      0,
+      500,
+      500
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Ficus_0.png",
+    "original": "T_Props_Ficus_0.png",
+    "name": "Ficus_0",
+    "axis": "height",
+    "world_size": 150,
+    "texture_size": [
+      2480,
+      3508
+    ],
+    "bounds": [
+      150,
+      112,
+      2286,
+      3149
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Ficus_1.png",
+    "original": "T_Props_Ficus_1.png",
+    "name": "Ficus_1",
+    "axis": "height",
+    "world_size": 150,
+    "texture_size": [
+      2480,
+      3508
+    ],
+    "bounds": [
+      132,
+      102,
+      2307,
+      3469
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_PickMeBox.png",
+    "original": "T_Furniture_Pickme_Box.png",
+    "name": "PickMeBox",
+    "axis": "width",
+    "world_size": 55,
+    "texture_size": [
+      1000,
+      1000
+    ],
+    "bounds": [
+      170,
+      326,
+      828,
+      656
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Bottle.png",
+    "original": "T_Proops_Bottle.PNG",
+    "name": "Bottle",
+    "axis": "width",
+    "world_size": 15,
+    "texture_size": [
+      1000,
+      1000
+    ],
+    "bounds": [
+      122,
+      209,
+      837,
+      832
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_Coil.png",
+    "original": "T_Proops_Coil.png",
+    "name": "Coil",
+    "axis": "height",
+    "world_size": 140,
+    "texture_size": [
+      2480,
+      3508
+    ],
+    "bounds": [
+      763,
+      657,
+      1717,
+      2942
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_DataComputer.png",
+    "original": "T_Proops_DataComputer.png",
+    "name": "DataComputer",
+    "axis": "width",
+    "world_size": 280,
+    "texture_size": [
+      1000,
+      1000
+    ],
+    "bounds": [
+      132,
+      262,
+      915,
+      639
+    ]
+  },
+  {
+    "source": "SourceArt/Props/T_Props_MetalCabinet.png",
+    "original": "T_Proops_Metall_Box.png",
+    "name": "MetalCabinet",
+    "axis": "width",
+    "world_size": 150,
+    "texture_size": [
+      2480,
+      3508
+    ],
+    "bounds": [
+      131,
+      1157,
+      2341,
+      2619
+    ]
+  }
+]
