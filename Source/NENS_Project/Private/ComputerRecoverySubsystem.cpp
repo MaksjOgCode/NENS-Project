@@ -46,13 +46,14 @@ int32 UComputerRecoverySubsystem::GetInventoryCount(FName ItemID) const
 }
 bool UComputerRecoverySubsystem::MarkSystemReady(EComputerSystem System,const FString& SourceKey)
 {
-    if ((System!=EComputerSystem::Power && System!=EComputerSystem::Fuel && System!=EComputerSystem::Display) || SourceKey.IsEmpty() || CompletedSources.Contains(SourceKey)) return false;
+    if ((System!=EComputerSystem::Power && System!=EComputerSystem::Fuel && System!=EComputerSystem::Display && System!=EComputerSystem::Arithmetic) || SourceKey.IsEmpty() || CompletedSources.Contains(SourceKey)) return false;
     CompletedSources.Add(SourceKey);
     if (ReadySystems.Contains(System)) return false;
     ReadySystems.Add(System);
     Changed(System==EComputerSystem::Power ? NSLOCTEXT("Recovery","PowerRestored","Power restored — Main computer")
         : System==EComputerSystem::Fuel ? NSLOCTEXT("Recovery","FuelRestored","Fuel supply restored — Main computer")
-        : NSLOCTEXT("Recovery","DisplayRestored","Display calibrated — Main computer"));
+        : System==EComputerSystem::Display ? NSLOCTEXT("Recovery","DisplayRestored","Display calibrated — Main computer")
+        : NSLOCTEXT("Recovery","ArithmeticRestored","Arithmetic check passed — Main computer"));
     return true;
 }
 int32 UComputerRecoverySubsystem::GetLoadableCardCount() const
@@ -78,7 +79,7 @@ int32 UComputerRecoverySubsystem::LoadProgramCards()
 bool UComputerRecoverySubsystem::CanRestore() const
 {
     return Definition && !bRestoring && !bRestored && !RequiredCards.IsEmpty() && LoadedCards.Num()==RequiredCards.Num()
-        && IsSystemReady(EComputerSystem::Power) && IsSystemReady(EComputerSystem::Fuel) && IsSystemReady(EComputerSystem::Display);
+        && IsSystemReady(EComputerSystem::Power) && IsSystemReady(EComputerSystem::Fuel) && IsSystemReady(EComputerSystem::Display) && IsSystemReady(EComputerSystem::Arithmetic);
 }
 bool UComputerRecoverySubsystem::BeginRestoration()
 {
@@ -117,6 +118,7 @@ FText UComputerRecoverySubsystem::GetNextStep() const
     if (!IsSystemReady(EComputerSystem::Power)) return NSLOCTEXT("Recovery","PowerHint","Connect the wires to restore power.");
     if (!IsSystemReady(EComputerSystem::Fuel)) return NSLOCTEXT("Recovery","FuelHint","Turn the valves to restore the fuel supply.");
     if (!IsSystemReady(EComputerSystem::Display)) return NSLOCTEXT("Recovery","DisplayHint","Align the disks to calibrate the display.");
+    if (!IsSystemReady(EComputerSystem::Arithmetic)) return NSLOCTEXT("Recovery","ArithmeticHint","Complete the arithmetic test at the small computer.");
     if (LoadedCards.Num()<RequiredCards.Num()) return NSLOCTEXT("Recovery","FindHint","Find the remaining punch cards for the recovery program.");
     return NSLOCTEXT("Recovery","ReadyHint","All requirements met. Run the recovery program.");
 }

@@ -32,6 +32,11 @@ public:
     static FString ConfigureDisksMinigame();
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString ConfigureComputerRecovery();
+    UFUNCTION(BlueprintCallable,Category="Interaction|Editor")
+    static FString ConfigureArithmeticMinigame();
+    /** Replace the matching decorative station/main-computer actors, keeping their visible transforms. */
+    UFUNCTION(BlueprintCallable,Category="Interaction|Editor")
+    static FString ConnectArithmeticLevel(const FString& AssetPath);
     /** Use the interaction sphere's center and place the Gosling ring between floor and walls. */
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString FixInteractionGeometry();

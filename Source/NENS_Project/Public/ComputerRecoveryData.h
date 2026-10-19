@@ -5,7 +5,7 @@
 class UInspectionSceneData;
 
 UENUM(BlueprintType)
-enum class EComputerSystem : uint8 { None, Power, Fuel, Display };
+enum class EComputerSystem : uint8 { None, Power, Fuel, Display, Arithmetic };
 
 /** The program is defined by the actual collectible placements, rather than a magic card count. */
 UCLASS(BlueprintType)

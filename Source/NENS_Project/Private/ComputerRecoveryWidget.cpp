@@ -38,13 +38,13 @@ void UComputerRecoveryWidget::Refresh()
 {
     auto* P=Progress.Get(); if (!P) return;
     auto SetText=[this](FName Name,const FText& Copy) { if (auto* T=Cast<UTextBlock>(WidgetTree->FindWidget(Name))) T->SetText(Copy); };
-    const bool Ready[]={P->IsSystemReady(EComputerSystem::Power),P->IsSystemReady(EComputerSystem::Fuel),P->IsSystemReady(EComputerSystem::Display),P->GetRequiredCardCount()>0 && P->GetLoadedCardCount()==P->GetRequiredCardCount()};
-    const FName Names[]={TEXT("Txt_PowerStatus"),TEXT("Txt_FuelStatus"),TEXT("Txt_DisplayStatus"),TEXT("Txt_ProgramStatus")};
-    for (int32 I=0;I<4;++I)
+    const bool Ready[]={P->IsSystemReady(EComputerSystem::Power),P->IsSystemReady(EComputerSystem::Fuel),P->IsSystemReady(EComputerSystem::Display),P->IsSystemReady(EComputerSystem::Arithmetic),P->GetRequiredCardCount()>0 && P->GetLoadedCardCount()==P->GetRequiredCardCount()};
+    const FName Names[]={TEXT("Txt_PowerStatus"),TEXT("Txt_FuelStatus"),TEXT("Txt_DisplayStatus"),TEXT("Txt_ArithmeticStatus"),TEXT("Txt_ProgramStatus")};
+    for (int32 I=0;I<5;++I)
     {
         if (Ready[I] && !LastReady[I]) ReadyOpacity[I]=.35f;
         LastReady[I]=Ready[I];
-        if (I<3) SetText(Names[I],Ready[I] ? NSLOCTEXT("Recovery","Ready","READY") : NSLOCTEXT("Recovery","Offline","OFFLINE"));
+        if (I<4) SetText(Names[I],Ready[I] ? NSLOCTEXT("Recovery","Ready","READY") : NSLOCTEXT("Recovery","Offline","OFFLINE"));
         if (auto* T=Cast<UTextBlock>(WidgetTree->FindWidget(Names[I]))) T->SetColorAndOpacity(FSlateColor(Ready[I] ? FLinearColor(.96f,.93f,.84f,1) : FLinearColor(.48f,.48f,.46f,1)));
     }
     SetText(TEXT("Txt_ProgramStatus"),FText::Format(NSLOCTEXT("Recovery","Loaded","{0} / {1} LOADED"),P->GetLoadedCardCount(),P->GetRequiredCardCount()));
@@ -52,7 +52,8 @@ void UComputerRecoveryWidget::Refresh()
     SetText(TEXT("Txt_NextStep"),P->GetNextStep());
     SetText(TEXT("Txt_State"),P->IsRestored() ? NSLOCTEXT("Recovery","StateOnline","COMPUTER ONLINE")
         : P->IsRestoring() ? NSLOCTEXT("Recovery","StateWorking","RECOVERING...")
-        : P->CanRestore() ? NSLOCTEXT("Recovery","StateReady","RECOVERY READY") : NSLOCTEXT("Recovery","StateOffline","SYSTEMS OFFLINE"));
+        : P->CanRestore() ? NSLOCTEXT("Recovery","StateReady","RECOVERY READY")
+        : P->GetReadySystemCount()==P->RequiredSystemCount ? NSLOCTEXT("Recovery","StateAwaitingCards","AWAITING PROGRAM") : NSLOCTEXT("Recovery","StateOffline","SYSTEMS OFFLINE"));
     SetText(TEXT("Txt_ProgressLabel"),P->IsRestoring() || P->IsRestored() ? NSLOCTEXT("Recovery","RunningLabel","RECOVERY PROGRAM") : NSLOCTEXT("Recovery","ReadinessLabel","SYSTEM READINESS"));
     if (auto* B=Cast<UButton>(WidgetTree->FindWidget(TEXT("Btn_LoadCards")))) B->SetIsEnabled(P->GetLoadableCardCount()>0 && !P->IsRestoring() && !P->IsRestored());
     if (auto* B=Cast<UButton>(WidgetTree->FindWidget(TEXT("Btn_Restore")))) B->SetIsEnabled(P->CanRestore());
@@ -62,14 +63,13 @@ void UComputerRecoveryWidget::NativeTick(const FGeometry& G,float DeltaTime)
 {
     Super::NativeTick(G,DeltaTime);
     auto* P=Progress.Get(); if (!P) return;
-    const int32 Systems=int32(P->IsSystemReady(EComputerSystem::Power))+int32(P->IsSystemReady(EComputerSystem::Fuel))+int32(P->IsSystemReady(EComputerSystem::Display));
-    const float Target=P->IsRestoring() || P->IsRestored() ? P->GetRestoreProgress() : (Systems+float(P->GetLoadedCardCount())/FMath::Max(1,P->GetRequiredCardCount()))/4.f;
+    const float Target=P->IsRestoring() || P->IsRestored() ? P->GetRestoreProgress() : (P->GetReadySystemCount()+float(P->GetLoadedCardCount())/FMath::Max(1,P->GetRequiredCardCount()))/(P->RequiredSystemCount+1.f);
     DisplayedProgress=FMath::FInterpTo(DisplayedProgress,Target,DeltaTime,8.f);
     if (auto* Bar=Cast<UProgressBar>(WidgetTree->FindWidget(TEXT("RecoveryProgress")))) Bar->SetPercent(DisplayedProgress);
     FNumberFormattingOptions NumberOptions; NumberOptions.SetMaximumFractionalDigits(0);
     if (auto* Copy=Cast<UTextBlock>(WidgetTree->FindWidget(TEXT("Txt_ProgressValue")))) Copy->SetText(FText::AsPercent(Target,&NumberOptions));
-    const FName Names[]={TEXT("Txt_PowerStatus"),TEXT("Txt_FuelStatus"),TEXT("Txt_DisplayStatus"),TEXT("Txt_ProgramStatus")};
-    for (int32 I=0;I<4;++I)
+    const FName Names[]={TEXT("Txt_PowerStatus"),TEXT("Txt_FuelStatus"),TEXT("Txt_DisplayStatus"),TEXT("Txt_ArithmeticStatus"),TEXT("Txt_ProgramStatus")};
+    for (int32 I=0;I<5;++I)
     {
         ReadyOpacity[I]=FMath::Min(1.f,ReadyOpacity[I]+DeltaTime*2);
         if (auto* T=WidgetTree->FindWidget(Names[I])) T->SetRenderOpacity(ReadyOpacity[I]);
@@ -114,9 +114,8 @@ void URecoveryObjectiveWidget::NativeConstruct()
 void URecoveryObjectiveWidget::Changed()
 {
     auto* P=Progress.Get(); if (!P || !Summary || !Notice) return;
-    const int32 Systems=int32(P->IsSystemReady(EComputerSystem::Power))+int32(P->IsSystemReady(EComputerSystem::Fuel))+int32(P->IsSystemReady(EComputerSystem::Display));
     Summary->SetText(P->IsRestored() ? NSLOCTEXT("Recovery","HUDOnline","COMPUTER ONLINE") : P->IsRestoring() ? NSLOCTEXT("Recovery","HUDWorking","Recovery program running...")
-        : FText::Format(NSLOCTEXT("Recovery","HUDProgress","Systems: {0} / 3    Program: {1} / {2}\nPunch cards in your bag: {3}"),Systems,P->GetLoadedCardCount(),P->GetRequiredCardCount(),P->GetInventoryCount(TEXT("PunchCard"))));
+        : FText::Format(NSLOCTEXT("Recovery","HUDProgressFour","Systems: {0} / {4}    Program: {1} / {2}\nPunch cards in your bag: {3}"),P->GetReadySystemCount(),P->GetLoadedCardCount(),P->GetRequiredCardCount(),P->GetInventoryCount(TEXT("PunchCard")),P->RequiredSystemCount));
     Notice->SetText(P->IsRestoring() || P->IsRestored() ? FText::GetEmpty() : P->GetLatestNotice()); NoticeAge=0;
     Notice->SetVisibility(Notice->GetText().IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 }

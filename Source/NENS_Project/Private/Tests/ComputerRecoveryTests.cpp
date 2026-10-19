@@ -76,6 +76,10 @@ bool FRecoveryInventoryTest::RunTest(const FString&)
     TestEqual(TEXT("Only missing required card loads"),P->LoadProgramCards(),1);
     TestEqual(TEXT("Two distinct cards loaded"),P->GetLoadedCardCount(),2);
     TestEqual(TEXT("Unrelated note remains in bag"),P->GetInventoryCount(TEXT("Note")),1);
+    TestFalse(TEXT("Cards and three systems still require arithmetic"),P->CanRestore());
+    TestTrue(TEXT("Arithmetic verifies computations"),P->MarkSystemReady(EComputerSystem::Arithmetic,TEXT("arithmetic")));
+    TestFalse(TEXT("Arithmetic cannot be counted twice"),P->MarkSystemReady(EComputerSystem::Arithmetic,TEXT("arithmetic")));
+    TestEqual(TEXT("Four distinct systems ready"),P->GetReadySystemCount(),4);
     TestTrue(TEXT("All requirements unlock recovery"),P->CanRestore());
     auto* Fresh=NewObject<UComputerRecoverySubsystem>(NewObject<UGameInstance>());
     Fresh->Configure(Data);
