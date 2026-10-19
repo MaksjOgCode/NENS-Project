@@ -30,6 +30,14 @@ bool UComputerRecoverySubsystem::Configure(UComputerRecoveryData* Data)
     return true;
 }
 void UComputerRecoverySubsystem::Changed(const FText& Notice) { LatestNotice=Notice; OnProgressChanged.Broadcast(); }
+void UComputerRecoverySubsystem::HideObjective() { if (Objective) Objective->RemoveFromParent(); Objective=nullptr; }
+void UComputerRecoverySubsystem::ResetForNewGame()
+{
+    if (GetGameInstance()) GetGameInstance()->GetTimerManager().ClearTimer(RestoreTimer);
+    HideObjective(); Definition=nullptr; Inventory.Reset(); RequiredCards.Reset(); LoadedCards.Reset();
+    ReadySystems.Reset(); CompletedSources.Reset(); bRestoring=false; bRestored=false; LatestNotice=FText::GetEmpty();
+    OnProgressChanged.Broadcast();
+}
 bool UComputerRecoverySubsystem::CollectItem(const FString& SourceKey,FName PickupID,FName ItemID)
 {
     if (SourceKey.IsEmpty() || PickupID.IsNone() || ItemID.IsNone() || Inventory.Contains(SourceKey)) return false;

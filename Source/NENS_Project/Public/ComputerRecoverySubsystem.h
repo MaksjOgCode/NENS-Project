@@ -24,6 +24,9 @@ class NENS_PROJECT_API UComputerRecoverySubsystem : public UGameInstanceSubsyste
     GENERATED_BODY()
 public:
     bool Configure(UComputerRecoveryData* Data);
+    /** A new run clears solved systems and collected cards, including the boot timer. */
+    void ResetForNewGame();
+    void HideObjective();
     static UComputerRecoverySubsystem* From(const UObject* Context);
     static FString PlacementKey(const UActorComponent* Source,FName PickupID = NAME_None);
     bool CollectItem(const FString& SourceKey,FName PickupID,FName ItemID);

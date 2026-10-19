@@ -32,6 +32,8 @@ public:
     static FString ConfigureDisksMinigame();
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString ConfigureComputerRecovery();
+    UFUNCTION(BlueprintCallable,Category="Game|Editor")
+    static FString ConfigureGamePresentation();
     UFUNCTION(BlueprintCallable,Category="Interaction|Editor")
     static FString ConfigureArithmeticMinigame();
     /** Replace the matching decorative station/main-computer actors, keeping their visible transforms. */

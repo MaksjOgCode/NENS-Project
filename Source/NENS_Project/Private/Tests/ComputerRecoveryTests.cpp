@@ -81,6 +81,12 @@ bool FRecoveryInventoryTest::RunTest(const FString&)
     TestFalse(TEXT("Arithmetic cannot be counted twice"),P->MarkSystemReady(EComputerSystem::Arithmetic,TEXT("arithmetic")));
     TestEqual(TEXT("Four distinct systems ready"),P->GetReadySystemCount(),4);
     TestTrue(TEXT("All requirements unlock recovery"),P->CanRestore());
+    P->ResetForNewGame();
+    TestFalse(TEXT("New-game reset clears solved placement"),P->HasCompletedSource(TEXT("arithmetic")));
+    TestEqual(TEXT("New-game reset clears systems"),P->GetReadySystemCount(),0);
+    TestEqual(TEXT("New-game reset clears bag"),P->GetInventoryCount(TEXT("Note")),0);
+    TestEqual(TEXT("New-game reset clears loaded cards"),P->GetLoadedCardCount(),0);
+    TestTrue(TEXT("Reset can configure next run"),P->Configure(Data));
     auto* Fresh=NewObject<UComputerRecoverySubsystem>(NewObject<UGameInstance>());
     Fresh->Configure(Data);
     TestFalse(TEXT("New run has no completed systems"),Fresh->IsSystemReady(EComputerSystem::Power));
