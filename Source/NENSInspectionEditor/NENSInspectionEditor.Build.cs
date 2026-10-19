@@ -10,7 +10,7 @@ public class NENSInspectionEditor : ModuleRules
         {
             "NENS_Project", "UnrealEd", "Kismet", "KismetCompiler", "BlueprintGraph",
             "UMGEditor", "UMG", "Json", "JsonUtilities", "BlueprintEditorLibrary",
-            "Slate", "SlateCore", "InputCore"
+            "Slate", "SlateCore", "InputCore", "Paper2D"
         });
     }
 }

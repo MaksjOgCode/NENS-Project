@@ -162,6 +162,9 @@ public:
         }
         auto* SourceNow = Source.Get();
         if (!SourceNow) { Test->AddError(TEXT("Computer component lost")); return true; }
+        if (Step != 1 && SourceNow->GetActiveWidget() && SourceNow->GetActiveWidget()->IsOpening()) return false;
+        if ((Step == 4 || Step == 6) && SourceNow->GetActiveWidget()) return false;
+        if (Step == 11 && Other.IsValid() && Other->GetActiveWidget()) return false;
         switch (Step)
         {
         case 1:
@@ -176,6 +179,7 @@ public:
             Test->TestFalse(TEXT("Inspection cannot overlap game"), Inspection->Open(Wardrobe.Get()));
             Test->TestFalse(TEXT("Gameplay interactions blocked"), UInspectionBlueprintLibrary::IsInteractionInputAllowed(PC->GetPawn()));
             PreviousAttempt.Reset(SourceNow->GetActiveWidget());
+            Test->TestEqual(TEXT("Opening starts transparent"), SourceNow->GetActiveWidget()->GetRenderOpacity(), 0.f);
             if (auto Window = FSlateApplication::Get().FindWidgetWindow(SourceNow->GetActiveWidget()->TakeWidget()))
             { OriginalWindowSize = Window->GetSizeInScreen(); Window->Resize(FVector2D(1700,950)); }
             break;
@@ -220,11 +224,12 @@ public:
             break;
         case 3:
             Click(SourceNow->GetActiveWidget(), NAME_None, FVector2D(.1,.1)); Escape();
-            Test->TestFalse(TEXT("Escape after background click closes modal"), Shared->IsOpen());
+            Test->TestTrue(TEXT("Escape starts fade and retains ownership"), Shared->IsOpen() && SourceNow->GetActiveWidget()->IsClosing());
             Test->TestFalse(TEXT("Abandoned game is not complete"), SourceNow->IsComplete());
-            Test->TestFalse(TEXT("Abort restores movement and cursor"), PC->IsMoveInputIgnored() || PC->bShowMouseCursor);
+            Test->TestTrue(TEXT("Exit fade keeps gameplay input locked"), PC->IsMoveInputIgnored() && PC->bShowMouseCursor);
             break;
         case 4:
+            Test->TestFalse(TEXT("Abort restores movement and cursor after fade"), PC->IsMoveInputIgnored() || PC->bShowMouseCursor);
             Invoke(Interaction.Get(), TEXT("TryInteract"));
             if (!Test->TestNotNull(TEXT("Abandoned computer can reopen"), SourceNow->GetActiveWidget())) return true;
             Test->TestTrue(TEXT("Fresh attempt has new widget"), SourceNow->GetActiveWidget() != PreviousAttempt.Get());
@@ -235,7 +240,7 @@ public:
             break;
         case 5:
             Test->TestTrue(TEXT("Original Close button clickable"), Click(SourceNow->GetActiveWidget(), TEXT("BtnClose")));
-            Test->TestFalse(TEXT("Original Close button restores shared session"), Shared->IsOpen());
+            Test->TestTrue(TEXT("Original Close button starts exit fade"), Shared->IsOpen() && SourceNow->GetActiveWidget()->IsClosing());
             break;
         case 6:
             Test->TestTrue(TEXT("Inspection opens after aborted minigame"), Inspection->Open(Wardrobe.Get()));
@@ -265,7 +270,11 @@ public:
             FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("WiresIntegration/wires-win.png"), true, false);
             break;
         case 9:
-            Escape();
+            if (SourceNow->GetActiveWidget())
+            {
+                if (!SourceNow->GetActiveWidget()->IsClosing()) Escape();
+                Next = Now + .05; return false;
+            }
             Test->TestFalse(TEXT("Successful computer cannot reopen"), SourceNow->OpenMinigame(PC->GetPawn()));
             Test->TestFalse(TEXT("Completed computer unavailable"), UInspectionBlueprintLibrary::IsInteractionAvailable(Computer.Get()));
             bWatch = true;

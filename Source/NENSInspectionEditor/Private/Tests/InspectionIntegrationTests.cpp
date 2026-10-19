@@ -138,7 +138,12 @@ public:
             {
                 auto* Canvas = UI->WidgetTree->FindWidget(TEXT("Canvas_Scene"));
                 const float SceneLeft = RootGeometry.AbsoluteToLocal(Canvas->GetCachedGeometry().LocalToAbsolute(FVector2D::ZeroVector)).X;
-                Test->TestTrue(TEXT("Wide-screen instructions stay in the left margin"), End.X <= SceneLeft + 1);
+                // Docked editor panels can leave a narrow game viewport even in a wide window.
+                // The help deliberately moves to the footer below a 190-unit side margin.
+                if (SceneLeft >= 190)
+                    Test->TestTrue(TEXT("Instructions stay in the available left margin"), End.X <= SceneLeft + 1);
+                else
+                    Test->TestTrue(TEXT("Narrow viewport instructions use the footer"), End.Y >= RootGeometry.GetLocalSize().Y - 40);
                 FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("InspectionPresentation/wardrobe-wide.png"), true, false);
                 HelpPreviewStep++; Next = Now + 1.2; return false;
             }

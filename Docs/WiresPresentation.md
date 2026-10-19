@@ -34,6 +34,8 @@ CanvasPanel_248                         весь экран
 | Mist Opacity | 0.42 | Плотность верхней дымки; 0 отключает эффект |
 | Mist Speed | 0.35 | Скорость движения; 0 останавливает |
 | Mist Height | 0.28 | Доля высоты экрана, занятая дымкой |
+| Scene Fade In Seconds | 0.30 | Продолжительность плавного появления |
+| Scene Fade Out Seconds | 0.24 | Продолжительность плавного закрытия |
 
 После изменений: **Compile → Save**, затем новый Play. Настройки шкафа в `WBP_InspectionScene` независимы от проводов.
 
@@ -41,7 +43,7 @@ CanvasPanel_248                         весь экран
 
 ## Исходники и служебная настройка
 
-- `Source/NENS_Project/Public/WiresMinigameWidget.h` и `Private/WiresMinigameWidget.cpp` — параметры оформления и создание процедурных эффектов.
+- `Source/NENS_Project/Public/MinigameWidget.h` и `Private/MinigameWidget.cpp` — общее оформление, процедурные эффекты и плавные переходы. `WiresMinigameWidget` сохраняет тип родителя существующего Blueprint.
 - `Source/NENSInspectionEditor/Private/WiresPresentationSetup.cpp` — перенос существующих элементов в масштабируемый макет через Unreal API. Содержимое `Board` и игровые графы не пересоздаются.
 - `Tools/style_wires_minigame.py` — первоначальное применение оформления и проверка сохранности графов/поля. Повторный запуск не перестраивает уже оформленный макет; для обычного редактирования запускать его не нужно.
 - `Source/NENSInspectionEditor/Private/Tests/MinigameIntegrationTests.cpp` — проверка поведения и разметки при изменении окна.

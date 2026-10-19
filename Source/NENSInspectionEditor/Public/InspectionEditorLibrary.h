@@ -24,6 +24,9 @@ public:
     /** Fit the existing wires board to the viewport; preserve its connectors and Blueprint rules. */
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString StyleWiresMinigame();
+    /** Adapt the existing valve board and existing PickMeBox asset to the shared modal interaction. */
+    UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
+    static FString ConfigureValvesMinigame();
     /** Use the interaction sphere's center and place the Gosling ring between floor and walls. */
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString FixInteractionGeometry();
