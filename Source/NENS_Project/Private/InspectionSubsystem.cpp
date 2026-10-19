@@ -34,8 +34,13 @@ bool UInspectionSubsystem::Open(USearchableComponent* Source)
 }
 void UInspectionSubsystem::Close()
 {
-    if (!ActiveWidget) return;
-    if (auto* Session = ActiveSession.Get()) Session->Close(ActiveWidget);
+    if (ActiveWidget) ActiveWidget->BeginClose();
+}
+void UInspectionSubsystem::FinishClose(UInspectionSceneWidget* ExpectedWidget)
+{
+    if (!ExpectedWidget || ActiveWidget != ExpectedWidget) return;
+    if (auto* Session = ActiveSession.Get()) Session->Close(ExpectedWidget);
+    else { SessionClosed(); ExpectedWidget->RemoveFromParent(); }
 }
 void UInspectionSubsystem::SessionClosed()
 {
@@ -45,4 +50,4 @@ void UInspectionSubsystem::SessionClosed()
     ActiveSession.Reset();
     if (IsValid(Source)) Source->NotifyInspectionClosed();
 }
-void UInspectionSubsystem::Deinitialize() { Close(); Super::Deinitialize(); }
+void UInspectionSubsystem::Deinitialize() { FinishClose(ActiveWidget); Super::Deinitialize(); }

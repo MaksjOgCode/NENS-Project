@@ -22,6 +22,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWindow.h"
 #include "UObject/UnrealType.h"
+#include "UObject/StrongObjectPtr.h"
 #include "UnrealClient.h"
 #include "Misc/Paths.h"
 
@@ -84,6 +85,7 @@ public:
         if (!PC || !PC->GetPawn() || !PC->GetLocalPlayer()) return false;
         auto* Session = PC->GetLocalPlayer()->GetSubsystem<UInspectionSubsystem>();
         if (!Session) { Test->AddError(TEXT("Inspection subsystem missing")); return true; }
+        if (auto* UI = Session->GetActiveWidget()) if (UI->IsOpening() || UI->IsClosing()) return false;
         if (Step == 0)
         {
             for (TActorIterator<AActor> It(World); It; ++It)
@@ -102,7 +104,7 @@ public:
                 for (int32 Repeat = 0; Repeat < 3; ++Repeat) Invoke(Probe, TEXT("SetPromptFocused"), &Args);
                 Test->TestFalse(TEXT("Repeated hide on an already hidden prompt does not start animation"), Probe->IsAnyAnimationPlaying());
             }
-            auto* Point = FindSceneComponent(Wardrobe.Get(), TEXT("InteractionPoint"));
+            auto* Point = FindSceneComponent(Wardrobe.Get(), TEXT("Sphere_Interaction"));
             if (!Test->TestNotNull(TEXT("Wardrobe interaction point"), Point)) return true;
             FVector Position = Point->GetComponentLocation(); Position.Z = PC->GetPawn()->GetActorLocation().Z;
             PC->GetPawn()->SetActorLocation(Position, false, nullptr, ETeleportType::TeleportPhysics);
@@ -120,12 +122,47 @@ public:
             Test->TestTrue(TEXT("Movement velocity stopped"), PC->GetPawn()->GetVelocity().IsNearlyZero());
             Test->TestFalse(TEXT("Gameplay interaction blocked during modal"), UInspectionBlueprintLibrary::IsInteractionInputAllowed(PC->GetPawn()));
             Test->TestFalse(TEXT("Second screen rejected"), Session->Open(C));
-            FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("InspectionImplementation/inspection-open.png"), true, false);
+            if (auto Window = FSlateApplication::Get().FindWidgetWindow(Session->GetActiveWidget()->TakeWidget()))
+            { OriginalWindowSize = Window->GetSizeInScreen(); Window->Resize(FVector2D(1700,950)); }
             break;
         case 2:
+        {
+            auto* UI = Session->GetActiveWidget();
+            auto* Help = UI->WidgetTree->FindWidget(TEXT("InspectionHelpPanel"));
+            if (!Test->TestNotNull(TEXT("Inspection controls exist"), Help)) return true;
+            const auto& RootGeometry = UI->GetCachedGeometry();
+            const FVector2D Start = RootGeometry.AbsoluteToLocal(Help->GetCachedGeometry().LocalToAbsolute(FVector2D::ZeroVector));
+            const FVector2D End = RootGeometry.AbsoluteToLocal(Help->GetCachedGeometry().LocalToAbsolute(Help->GetCachedGeometry().GetLocalSize()));
+            Test->TestTrue(TEXT("Instructions fit in the viewport after resizing"), Start.X >= 0 && Start.Y >= 0 && End.X <= RootGeometry.GetLocalSize().X + 1 && End.Y <= RootGeometry.GetLocalSize().Y + 1);
+            if (HelpPreviewStep == 0)
+            {
+                auto* Canvas = UI->WidgetTree->FindWidget(TEXT("Canvas_Scene"));
+                const float SceneLeft = RootGeometry.AbsoluteToLocal(Canvas->GetCachedGeometry().LocalToAbsolute(FVector2D::ZeroVector)).X;
+                Test->TestTrue(TEXT("Wide-screen instructions stay in the left margin"), End.X <= SceneLeft + 1);
+                FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("InspectionPresentation/wardrobe-wide.png"), true, false);
+                HelpPreviewStep++; Next = Now + 1.2; return false;
+            }
+            if (HelpPreviewStep == 1)
+            {
+                FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("InspectionTransitions/fog-drift.png"), true, false);
+                HelpPreviewStep++; Next = Now + .2; return false;
+            }
+            if (HelpPreviewStep == 2)
+            {
+                if (auto Window = FSlateApplication::Get().FindWidgetWindow(UI->TakeWidget())) Window->Resize(FVector2D(1000,900));
+                HelpPreviewStep++; Next = Now + .4; return false;
+            }
+            if (HelpPreviewStep == 3)
+            {
+                FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("InspectionPresentation/wardrobe-compact.png"), true, false);
+                HelpPreviewStep++; Next = Now + .2; return false;
+            }
+            const auto TestWindow = FSlateApplication::Get().FindWidgetWindow(UI->TakeWidget());
             Test->TestTrue(TEXT("Background mouse routed"), Click(Session->GetActiveWidget(), FVector2D(.1,.1)));
             Key(EKeys::Escape);
+            if (TestWindow) TestWindow->Resize(OriginalWindowSize);
             break;
+        }
         case 3:
             if (!Test->TestFalse(TEXT("Escape after background click closes"), Session->IsOpen())) return true;
             Test->TestFalse(TEXT("Cursor restored"), PC->bShowMouseCursor);
@@ -139,8 +176,19 @@ public:
         case 4:
             if (!Test->TestEqual(TEXT("One card shown"), Session->GetActiveWidget()->GetPickupButtons().Num(), 1)) return true;
             Test->TestTrue(TEXT("Card mouse click routed"), Click(Session->GetActiveWidget()->GetPickupButtons()[0]));
-            break;
+            Test->TestTrue(TEXT("Pickup is committed at the beginning of its animation"), C->IsComplete());
+            Test->TestTrue(TEXT("Pickup begins fading rather than disappearing instantly"), Session->GetActiveWidget()->GetPickupButtons()[0]->IsCollectionFading());
+            Test->TestEqual(TEXT("Fading pickup no longer accepts clicks"), Session->GetActiveWidget()->GetPickupButtons()[0]->GetVisibility(), ESlateVisibility::HitTestInvisible);
+            Step++; Next = Now + .12; return false;
         case 5:
+            if (!bFadeChecked)
+            {
+                const float Opacity = Session->GetActiveWidget()->GetPickupButtons()[0]->GetRenderOpacity();
+                Test->TestTrue(TEXT("Real UI ticks produce an intermediate pickup opacity"), Opacity > 0 && Opacity < 1);
+                Test->TestFalse(TEXT("Repeated collection during fade is rejected"), Session->GetActiveWidget()->CollectPickup(C->Scene->Pickups[0].PickupID));
+                FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("InspectionPresentation/pickup-fading.png"), true, false);
+                bFadeChecked = true; Next = Now + .6; return false;
+            }
             if (!Test->TestTrue(TEXT("Real click records collection"), C->IsComplete())) return true;
             Test->TestTrue(TEXT("Last item does not auto-close"), Session->IsOpen());
             Test->TestEqual(TEXT("Card hidden after confirmation"), Session->GetActiveWidget()->GetPickupButtons()[0]->GetVisibility(), ESlateVisibility::Collapsed);
@@ -170,8 +218,18 @@ public:
             Other = Second->FindComponentByClass<USearchableComponent>();
             if (!Test->TestNotNull(TEXT("Second source"), Other.Get())) return true;
             Test->TestFalse(TEXT("Progress independent of first wardrobe"), Other->IsComplete());
-            { auto* Data = DuplicateObject<UInspectionSceneData>(C->Scene, Other.Get());
-              FInspectionPickup Extra = Data->Pickups[0]; Extra.PickupID = TEXT("SecondCard"); Extra.Position = FVector2D(316,660); Data->Pickups.Add(Extra); Other->Scene = Data; }
+            {
+                auto* Data = DuplicateObject<UInspectionSceneData>(C->Scene, Other.Get());
+                const auto& First = Data->Pickups[0];
+                FInspectionPickup Extra = First; Extra.PickupID = TEXT("SecondCard");
+                const FVector2D Far = Data->CanvasSize - Extra.Size;
+                bool bPlaced = false;
+                for (const FVector2D Position : {FVector2D::ZeroVector, FVector2D(Far.X,0), FVector2D(0,Far.Y), Far})
+                    if (!FBox2D(First.Position, First.Position + First.Size).Intersect(FBox2D(Position, Position + Extra.Size)))
+                    { Extra.Position = Position; bPlaced = true; break; }
+                if (!Test->TestTrue(TEXT("Test pickups have separate click targets regardless of user layout"), bPlaced)) return true;
+                Data->Pickups.Add(Extra); Other->Scene = Data;
+            }
             Test->TestTrue(TEXT("Multiple-pickup scene opens"), Session->Open(Other.Get()));
             break;
         case 8:
@@ -179,13 +237,17 @@ public:
             if (!Test->TestTrue(TEXT("Multi scene active"), Session->IsOpen())) return true;
             Test->TestEqual(TEXT("Two pickups shown"), Session->GetActiveWidget()->GetPickupButtons().Num(), 2);
             Click(Session->GetActiveWidget()->GetPickupButtons()[0]);
+            ClosingDuringFade.Reset(Session->GetActiveWidget());
+            Test->TestTrue(TEXT("Partial scene pickup is still fading when leaving"), ClosingDuringFade->GetPickupButtons()[0]->IsCollectionFading());
             Key(EKeys::Escape);
+            Test->TestTrue(TEXT("Exit fade keeps movement blocked until it finishes"), PC->IsMoveInputIgnored());
             break;
         case 9:
             PC->GetPawn()->SetActorLocation(NearPosition + FVector(600,0,0), false, nullptr, ETeleportType::TeleportPhysics);
             Test->TestFalse(TEXT("Partially collected scene remains available"), Other->IsComplete());
             if (!Test->TestTrue(TEXT("Partially collected scene reopens"), Session->Open(Other.Get()))) return true;
             Test->TestEqual(TEXT("Collected item does not respawn"), Session->GetActiveWidget()->GetPickupButtons().Num(), 1);
+            Test->TestFalse(TEXT("Closed widget cannot collect an uncollected item from the new session"), ClosingDuringFade->CollectPickup(Other->Scene->Pickups[1].PickupID));
             break;
         case 10:
             PC->GetPawn()->SetActorLocation(NearPosition, false, nullptr, ETeleportType::TeleportPhysics);
@@ -206,7 +268,10 @@ private:
     FAutomationTestBase* Test;
     double Started, Next = 0;
     int32 Step = 0;
-    bool bWatchCompletedPrompt = false;
+    bool bWatchCompletedPrompt = false, bFadeChecked = false;
+    int32 HelpPreviewStep = 0;
+    FVector2D OriginalWindowSize;
+    TStrongObjectPtr<UInspectionSceneWidget> ClosingDuringFade;
     FVector NearPosition = FVector::ZeroVector;
     TWeakObjectPtr<USearchableComponent> Source, Other;
     TWeakObjectPtr<AActor> Wardrobe, Second;
@@ -227,6 +292,7 @@ public:
         auto* PC = World->GetFirstPlayerController();
         if (!PC || !PC->GetPawn() || !PC->GetLocalPlayer()) return false;
         auto* Session = PC->GetLocalPlayer()->GetSubsystem<UInspectionSubsystem>();
+        if (auto* UI = Session->GetActiveWidget()) if (UI->IsOpening() || UI->IsClosing()) return false;
         if (Step == 0)
         {
             for (TActorIterator<AActor> It(World); It; ++It)
@@ -234,7 +300,7 @@ public:
                     if (C->Scene && C->Scene->GetFName() == TEXT("DA_Inspection_Gosling")) { Source = C; Picture = *It; break; }
             if (!Test->TestNotNull(TEXT("Placed Gosling picture has inspection configured"), Source.Get())) return true;
             for (auto* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
-            auto* Point = FindSceneComponent(Picture.Get(), TEXT("InteractionPoint"));
+            auto* Point = FindSceneComponent(Picture.Get(), TEXT("Sphere_Interaction"));
             if (!Test->TestNotNull(TEXT("Picture interaction point"), Point) || !Test->TestNotNull(TEXT("Existing interaction component"), Interaction.Get())) return true;
             Test->TestEqual(TEXT("Hint scene contains no pickups"), Source->Scene->Pickups.Num(), 0);
             Test->TestEqual(TEXT("Portrait canvas preserves original dimensions"), Source->Scene->CanvasSize, FVector2D(2480,3508));
@@ -247,6 +313,11 @@ public:
         switch (Step)
         {
         case 1:
+            if (Visits == 0 && !bGeometryPreview)
+            {
+                FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("InteractionGeometry/gosling-ring.png"), true, false);
+                bGeometryPreview = true; Next = Now + .2; return false;
+            }
             Invoke(Interaction.Get(), TEXT("TryInteract"));
             if (!Test->TestTrue(TEXT("E interaction opens Gosling art on every visit"), Session->IsOpen())) return true;
             if (!Test->TestEqual(TEXT("Inspection belongs to picture"), Session->GetActiveSource(), Source.Get())) return true;
@@ -271,10 +342,10 @@ public:
         case 3:
             Test->TestTrue(TEXT("Art click routed without collecting anything"), Click(Session->GetActiveWidget(), FVector2D(.5,.5)));
             Key(EKeys::Escape);
-            Test->TestFalse(TEXT("Escape after art click closes inspection"), Session->IsOpen());
+            Test->TestTrue(TEXT("Escape after art click begins closing inspection"), Session->GetActiveWidget()->IsClosing());
             Test->TestFalse(TEXT("Picture remains incomplete after viewing"), Source->IsComplete());
             Test->TestTrue(TEXT("Picture remains available after viewing"), UInspectionBlueprintLibrary::IsInteractionAvailable(Picture.Get()));
-            Test->TestFalse(TEXT("Closing art restores cursor and movement"), PC->bShowMouseCursor || PC->IsMoveInputIgnored());
+            Test->TestTrue(TEXT("Art keeps modal input during its exit fade"), PC->bShowMouseCursor && PC->IsMoveInputIgnored());
             for (FName Name : {FName(TEXT("Widget_InteractionPrompt")), FName(TEXT("Ring_Visual"))})
             {
                 auto* Indicator = FindSceneComponent(Picture.Get(), Name);
@@ -302,6 +373,7 @@ private:
     FAutomationTestBase* Test;
     double Started, Next = 0;
     int32 Step = 0, Visits = 0;
+    bool bGeometryPreview = false;
     FVector Near;
     TWeakObjectPtr<USearchableComponent> Source;
     TWeakObjectPtr<AActor> Picture;
@@ -330,6 +402,7 @@ public:
         auto* PC = World->GetFirstPlayerController();
         if (!PC || !PC->GetPawn() || !PC->GetLocalPlayer()) return false;
         auto* Session = PC->GetLocalPlayer()->GetSubsystem<UInspectionSubsystem>();
+        if (auto* UI = Session->GetActiveWidget()) if (UI->IsOpening() || UI->IsClosing()) return false;
         if (Step == 0)
         {
             for (TActorIterator<AActor> It(World); It; ++It)
@@ -337,7 +410,7 @@ public:
                     if (C->Scene && C->Scene->GetFName() == TEXT("DA_Inspection_Table")) { Source = C; Table = *It; break; }
             if (!Test->TestNotNull(TEXT("Existing table has inspection configured"), Source.Get())) return true;
             for (auto* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
-            auto* Point = FindSceneComponent(Table.Get(), TEXT("InteractionPoint"));
+            auto* Point = FindSceneComponent(Table.Get(), TEXT("Sphere_Interaction"));
             if (!Test->TestNotNull(TEXT("Interaction component"), Interaction.Get()) || !Test->TestNotNull(TEXT("Table interaction point"), Point)) return true;
             auto* Data = Source->Scene.Get();
             FString Error;
@@ -377,10 +450,10 @@ public:
         }
         case 3:
             Click(Session->GetActiveWidget(), FVector2D(.05,.05)); Key(EKeys::Escape);
-            Test->TestFalse(TEXT("Escape after background click closes table"), Session->IsOpen());
+            Test->TestTrue(TEXT("Escape after background click starts table exit fade"), Session->GetActiveWidget()->IsClosing());
             Test->TestFalse(TEXT("Leaving note uncollected keeps table incomplete"), C->IsComplete());
             Test->TestTrue(TEXT("Unfinished table remains available"), UInspectionBlueprintLibrary::IsInteractionAvailable(Table.Get()));
-            Test->TestFalse(TEXT("Abort restores cursor and movement"), PC->bShowMouseCursor || PC->IsMoveInputIgnored());
+            Test->TestTrue(TEXT("Abort keeps cursor and movement lock until fade ends"), PC->bShowMouseCursor && PC->IsMoveInputIgnored());
             break;
         case 4:
             Invoke(Interaction.Get(), TEXT("TryInteract"));
@@ -391,21 +464,24 @@ public:
             Test->TestTrue(TEXT("Actual mouse click on note"), Click(Session->GetActiveWidget()->GetPickupButtons()[0]));
             if (!Test->TestTrue(TEXT("Note click completes table"), C->IsComplete())) return true;
             Test->TestTrue(TEXT("Note collection recorded"), C->IsCollected(TEXT("Table_Note")));
-            Test->TestEqual(TEXT("Note hidden after collection"), Session->GetActiveWidget()->GetPickupButtons()[0]->GetVisibility(), ESlateVisibility::Collapsed);
+            Test->TestTrue(TEXT("Note fades after collection"), Session->GetActiveWidget()->GetPickupButtons()[0]->IsCollectionFading());
             Test->TestFalse(TEXT("Duplicate note collection rejected"), C->TryCollect(TEXT("Table_Note")));
             Test->TestTrue(TEXT("Last pickup keeps inspection open"), Session->IsOpen());
             FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("TableInspection/table-collected.png"), true, false);
             break;
         case 6:
+            if (Session->GetActiveWidget()->GetPickupButtons()[0]->IsCollectionFading()) { Next = Now + .1; return false; }
+            Test->TestEqual(TEXT("Note hidden after its fade"), Session->GetActiveWidget()->GetPickupButtons()[0]->GetVisibility(), ESlateVisibility::Collapsed);
             Key(EKeys::Escape);
-            Test->TestFalse(TEXT("Escape after note click closes table"), Session->IsOpen());
+            Test->TestTrue(TEXT("Escape after note click starts table exit fade"), Session->GetActiveWidget()->IsClosing());
             Test->TestFalse(TEXT("Completed table is unavailable"), UInspectionBlueprintLibrary::IsInteractionAvailable(Table.Get()));
             Test->TestFalse(TEXT("Completed table cannot open again"), Session->Open(C));
-            Test->TestFalse(TEXT("Controls restored after collection"), PC->bShowMouseCursor || PC->IsMoveInputIgnored());
-            bWatch = true;
+            Test->TestTrue(TEXT("Exit fade retains modal controls"), PC->bShowMouseCursor && PC->IsMoveInputIgnored());
             PC->GetPawn()->SetActorLocation(Near + FVector(600,0,0), false, nullptr, ETeleportType::TeleportPhysics);
             break;
         case 7:
+            bWatch = true;
+            Test->TestFalse(TEXT("Table controls restored after exit fade"), PC->bShowMouseCursor || PC->IsMoveInputIgnored());
             PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
             Invoke(Interaction.Get(), TEXT("UpdateInteractionTarget"));
             if (auto* P = FindFProperty<FObjectProperty>(Interaction->GetClass(), TEXT("CurrentInteractable")))

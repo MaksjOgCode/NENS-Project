@@ -150,7 +150,7 @@ public:
             for (TActorIterator<AActor> It(World); It; ++It) if (auto* C = It->FindComponentByClass<UClockInspectionComponent>()) { Source = C; Actor = *It; break; }
             if (!Test->TestNotNull(TEXT("Configured clock on gameplay map"), Source.Get())) return true;
             for (auto* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
-            auto* Point = Component(Actor.Get(), TEXT("InteractionPoint"));
+            auto* Point = Component(Actor.Get(), TEXT("Sphere_Interaction"));
             if (!Test->TestNotNull(TEXT("Clock interaction point"), Point)) return true;
             Near = Point->GetComponentLocation(); Near.Z = PC->GetPawn()->GetActorLocation().Z;
             PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
@@ -158,6 +158,7 @@ public:
         }
         auto* C = Source.Get();
         auto* UI = Cast<UClockInspectionWidget>(Session->GetActiveWidget());
+        if (UI && (UI->IsOpening() || UI->IsClosing())) return false;
         switch (Step)
         {
         case 1:
@@ -188,13 +189,14 @@ public:
             Key(EKeys::Tab); Test->TestEqual(TEXT("Tab selects other hand"), UI->GetSelectedHand(), EClockHand::Long); Key(EKeys::Tab);
             BeginUnfinishedDrag(UI, UI->HandTip(EClockHand::Short), C->Puzzle->DialCenter + Direction(150) * 70);
             Key(EKeys::Escape);
-            Test->TestFalse(TEXT("Escape before solution closes UI"), Session->IsOpen());
-            Test->TestFalse(TEXT("Abort restores movement and cursor"), PC->IsMoveInputIgnored() || PC->bShowMouseCursor);
+            Test->TestTrue(TEXT("Escape before solution starts UI exit fade"), UI->IsClosing());
+            Test->TestTrue(TEXT("Exit fade keeps movement blocked and cursor visible"), PC->IsMoveInputIgnored() && PC->bShowMouseCursor);
             Test->TestFalse(TEXT("Escape releases an unfinished mouse capture"), UI->HasMouseCapture());
             { auto& S = FSlateApplication::Get(); const FVector2D P = S.GetCursorPos();
               S.ProcessMouseButtonUpEvent(FPointerEvent(0, P, P, TSet<FKey>(), EKeys::LeftMouseButton, 0, FModifierKeysState())); }
             break;
         case 4:
+            Test->TestFalse(TEXT("Abort restores movement and cursor after exit fade"), PC->IsMoveInputIgnored() || PC->bShowMouseCursor);
             Invoke(Interaction.Get(), TEXT("TryInteract"));
             UI = Cast<UClockInspectionWidget>(Session->GetActiveWidget());
             if (!Test->TestNotNull(TEXT("Unsolved clock reopens"), UI)) return true;
@@ -217,7 +219,7 @@ public:
         case 7:
             Test->TestTrue(TEXT("Soft transition is in progress"), UI->IsTransitioning());
             Key(EKeys::Escape);
-            Test->TestFalse(TEXT("Escape during fade closes UI"), Session->IsOpen());
+            Test->TestTrue(TEXT("Escape during compartment transition starts UI exit fade"), UI->IsClosing());
             Test->TestTrue(TEXT("Solution committed before fade completes"), C->IsPuzzleSolved());
             break;
         case 8:
@@ -245,11 +247,12 @@ public:
             if (!Test->TestTrue(TEXT("Real click collects clock punch card"), C->IsComplete())) return true;
             Test->TestFalse(TEXT("Duplicate card rejected"), C->TryCollect(TEXT("FloorClock_PunchCard")));
             Test->TestTrue(TEXT("Collecting card keeps screen open until Escape"), Session->IsOpen());
-            Key(EKeys::Escape); bWatch = true;
+            Key(EKeys::Escape);
             PC->GetPawn()->SetActorLocation(Near + FVector(600,0,0), false, nullptr, ETeleportType::TeleportPhysics);
             break;
         }
         case 12:
+            bWatch = true;
             PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
             Test->TestFalse(TEXT("Collected clock unavailable"), UInspectionBlueprintLibrary::IsInteractionAvailable(Actor.Get()));
             Test->TestFalse(TEXT("Collected clock cannot reopen"), Session->Open(C));

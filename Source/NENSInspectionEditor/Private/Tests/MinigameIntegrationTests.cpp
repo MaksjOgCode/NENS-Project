@@ -10,6 +10,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Components/SceneComponent.h"
 #include "Components/WidgetComponent.h"
+#include "Components/TextBlock.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Framework/Application/SlateApplication.h"
@@ -18,8 +19,10 @@
 #include "UObject/UnrealType.h"
 #include "MinigameComponent.h"
 #include "MinigameWidget.h"
+#include "WiresMinigameWidget.h"
 #include "InteractionSessionSubsystem.h"
 #include "InspectionSubsystem.h"
+#include "InspectionSceneWidget.h"
 #include "InspectionSceneData.h"
 #include "InspectionBlueprintLibrary.h"
 #include "SearchableComponent.h"
@@ -72,6 +75,50 @@ void Connect(UUserWidget* Widget, int32 Pair)
     Click(Widget, FName(*FString::Printf(TEXT("BtnL%d"), Pair)));
     Click(Widget, FName(*FString::Printf(TEXT("BtnR%d"), Pair)));
 }
+void CheckPresentation(FAutomationTestBase* Test, UMinigameWidget* UI)
+{
+    Test->TestNotNull(TEXT("Wires uses its presentation adapter"), Cast<UWiresMinigameWidget>(UI));
+    const auto& View = UI->GetCachedGeometry();
+    const FVector2D ViewSize = View.GetLocalSize();
+    for (FName Name : {TEXT("Canvas_WiresPresentation"), TEXT("Board"), TEXT("TxtTitle"), TEXT("TxtStatus"), TEXT("Text_WiresControls"), TEXT("BtnClose"), TEXT("BtnL0"), TEXT("BtnL1"), TEXT("BtnL2"), TEXT("BtnR0"), TEXT("BtnR1"), TEXT("BtnR2")})
+    {
+        auto* Part = UI->WidgetTree->FindWidget(Name);
+        if (!Test->TestNotNull(TEXT("Presentation element exists: ") + Name.ToString(), Part)) continue;
+        const auto& Geometry = Part->GetCachedGeometry();
+        const FVector2D Start = View.AbsoluteToLocal(Geometry.LocalToAbsolute(FVector2D::ZeroVector));
+        const FVector2D End = View.AbsoluteToLocal(Geometry.LocalToAbsolute(Geometry.GetLocalSize()));
+        Test->TestTrue(TEXT("Element fits in viewport: ") + Name.ToString(),
+            Geometry.GetLocalSize().X > 0 && Geometry.GetLocalSize().Y > 0 && Start.X >= -1 && Start.Y >= -1 && End.X <= ViewSize.X + 1 && End.Y <= ViewSize.Y + 1);
+        if (Name == TEXT("Canvas_WiresPresentation"))
+            Test->TestTrue(TEXT("Complete presentation centered on both axes"), ((Start + End) * .5).Equals(ViewSize * .5, 1));
+        if (Name == TEXT("Board"))
+            Test->TestTrue(TEXT("Art and connector coordinates preserve their aspect ratio"), FMath::IsNearlyEqual((End.X - Start.X) / (End.Y - Start.Y), 1280. / 720., .002));
+        if (auto* Text = Cast<UTextBlock>(Part))
+            Test->TestTrue(TEXT("Text uses the shared inspection font"), Text->GetFont().FontObject && Text->GetFont().FontObject->GetFName() == TEXT("F_IMFellEnglish"));
+    }
+    for (FName Name : {TEXT("WiresGradient"), TEXT("WiresMist")})
+    {
+        auto* Effect = UI->WidgetTree->FindWidget(Name);
+        if (!Test->TestNotNull(TEXT("Shared procedural effect exists"), Effect)) continue;
+        Test->TestEqual(TEXT("Effects never intercept a connector click"), Effect->GetVisibility(), ESlateVisibility::HitTestInvisible);
+        if (Name == TEXT("WiresGradient"))
+        {
+            const auto& Geometry = Effect->GetCachedGeometry();
+            Test->TestTrue(TEXT("Gradient covers entire modal rather than a small black rectangle"),
+                Geometry.GetLocalSize().Equals(ViewSize, 1) && View.AbsoluteToLocal(Geometry.LocalToAbsolute(FVector2D::ZeroVector)).IsNearlyZero(1));
+        }
+    }
+    auto* Board = UI->WidgetTree->FindWidget(TEXT("Board"));
+    auto* Background = UI->WidgetTree->FindWidget(TEXT("Img_Bg"));
+    if (Board && Background)
+    {
+        const auto& BoardGeometry = Board->GetCachedGeometry();
+        const auto& BackgroundGeometry = Background->GetCachedGeometry();
+        const FVector2D Start = BoardGeometry.AbsoluteToLocal(BackgroundGeometry.LocalToAbsolute(FVector2D::ZeroVector));
+        Test->TestTrue(TEXT("Opaque source padding cropped without shifting the artwork relative to buttons"),
+            FMath::IsNearlyEqual(Start.X, 1280 * .092, .1) && FMath::IsNearlyEqual(BackgroundGeometry.GetLocalSize().X, 1280 * .81, .1));
+    }
+}
 
 class FComputerFlow : public IAutomationLatentCommand
 {
@@ -106,7 +153,7 @@ public:
             }
             if (!Test->TestNotNull(TEXT("Configured computer on gameplay map"), Source.Get()) || !Test->TestNotNull(TEXT("Wardrobe for modal exclusion"), Wardrobe.Get())) return true;
             for (auto* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
-            auto* Point = SceneComponent(Computer.Get(), TEXT("InteractionPoint"));
+            auto* Point = SceneComponent(Computer.Get(), TEXT("Sphere_Interaction"));
             if (!Test->TestNotNull(TEXT("Existing BPC_Interaction"), Interaction.Get()) || !Test->TestNotNull(TEXT("Computer interaction point"), Point)) return true;
             Near = Point->GetComponentLocation(); Near.Z = PC->GetPawn()->GetActorLocation().Z;
             PC->GetPawn()->SetActorLocation(Near, false, nullptr, ETeleportType::TeleportPhysics);
@@ -129,9 +176,42 @@ public:
             Test->TestFalse(TEXT("Inspection cannot overlap game"), Inspection->Open(Wardrobe.Get()));
             Test->TestFalse(TEXT("Gameplay interactions blocked"), UInspectionBlueprintLibrary::IsInteractionInputAllowed(PC->GetPawn()));
             PreviousAttempt.Reset(SourceNow->GetActiveWidget());
-            FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("WiresIntegration/wires-open.png"), true, false);
+            if (auto Window = FSlateApplication::Get().FindWidgetWindow(SourceNow->GetActiveWidget()->TakeWidget()))
+            { OriginalWindowSize = Window->GetSizeInScreen(); Window->Resize(FVector2D(1700,950)); }
             break;
         case 2:
+            if (PreviewStep < 7)
+            {
+                auto* UI = SourceNow->GetActiveWidget();
+                auto Window = FSlateApplication::Get().FindWidgetWindow(UI->TakeWidget());
+                if (PreviewStep == 0)
+                {
+                    CheckPresentation(Test, UI);
+                    FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("WiresPresentation/wires-wide.png"), true, false);
+                    PreviewStep++; Next = Now + 1.2; return false;
+                }
+                if (PreviewStep == 1)
+                {
+                    FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("WiresPresentation/wires-mist-drift.png"), true, false);
+                    PreviewStep++; Next = Now + .2; return false;
+                }
+                if (PreviewStep == 2) { if (Window) Window->Resize(FVector2D(1000,900)); }
+                if (PreviewStep == 3)
+                {
+                    CheckPresentation(Test, UI);
+                    Click(UI, TEXT("BtnL0")); Click(UI, TEXT("BtnR1"));
+                    Test->TestEqual(TEXT("Real connector clicks still reach Blueprint after compact resize"), ReadInt(UI, TEXT("ConnectedCount")), 0);
+                    FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("WiresPresentation/wires-compact.png"), true, false);
+                }
+                if (PreviewStep == 4) { if (Window) Window->Resize(FVector2D(2000,850)); }
+                if (PreviewStep == 5)
+                {
+                    CheckPresentation(Test, UI);
+                    FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("WiresPresentation/wires-ultrawide.png"), true, false);
+                }
+                if (PreviewStep == 6) { if (Window) Window->Resize(OriginalWindowSize); }
+                PreviewStep++; Next = Now + .4; return false;
+            }
             Click(SourceNow->GetActiveWidget(), TEXT("BtnL0")); Click(SourceNow->GetActiveWidget(), TEXT("BtnR1"));
             Test->TestEqual(TEXT("Wrong pair is not counted"), ReadInt(SourceNow->GetActiveWidget(), TEXT("ConnectedCount")), 0);
             Test->TestFalse(TEXT("Wrong pair does not complete computer"), SourceNow->IsComplete());
@@ -162,7 +242,16 @@ public:
             Test->TestFalse(TEXT("Minigame cannot overlap inspection"), SourceNow->OpenMinigame(PC->GetPawn()));
             break;
         case 7:
-            Escape();
+            if (Inspection->IsOpen())
+            {
+                if (!Inspection->GetActiveWidget()->IsClosing())
+                {
+                    Escape();
+                    Test->TestTrue(TEXT("Inspection exit fade retains shared modal ownership"), Shared->IsOpen());
+                    Test->TestFalse(TEXT("Minigame cannot overlap a closing inspection"), SourceNow->OpenMinigame(PC->GetPawn()));
+                }
+                Next = Now + .05; return false;
+            }
             Test->TestFalse(TEXT("Inspection Escape restores shared session"), Shared->IsOpen());
             Invoke(Interaction.Get(), TEXT("TryInteract"));
             if (!Test->TestNotNull(TEXT("Computer opens after inspection"), SourceNow->GetActiveWidget())) return true;
@@ -223,6 +312,8 @@ private:
     int32 Step = 0;
     bool bWatch = false;
     FVector Near;
+    FVector2D OriginalWindowSize = FVector2D::ZeroVector;
+    int32 PreviewStep = 0;
     TWeakObjectPtr<UMinigameComponent> Source, Other;
     TWeakObjectPtr<USearchableComponent> Wardrobe;
     TWeakObjectPtr<AActor> Computer, OtherActor;

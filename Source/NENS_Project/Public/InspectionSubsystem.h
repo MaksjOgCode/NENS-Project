@@ -15,6 +15,8 @@ class NENS_PROJECT_API UInspectionSubsystem : public ULocalPlayerSubsystem
 public:
     UFUNCTION(BlueprintCallable, Category="Inspection") bool Open(USearchableComponent* Source);
     UFUNCTION(BlueprintCallable, Category="Inspection") void Close();
+    /** Immediate teardown, guarded by the originating widget. Used after its fade or on destruction. */
+    void FinishClose(UInspectionSceneWidget* ExpectedWidget);
     UFUNCTION(BlueprintPure, Category="Inspection") bool IsOpen() const { return ActiveWidget != nullptr; }
     UInspectionSceneWidget* GetActiveWidget() const { return ActiveWidget; }
     USearchableComponent* GetActiveSource() const { return ActiveSource.Get(); }

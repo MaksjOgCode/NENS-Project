@@ -21,6 +21,12 @@ public:
     static FString ConfigureSearchableActor(UBlueprint* Blueprint, UInspectionSceneData* Scene);
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString ConfigureWiresMinigame();
+    /** Fit the existing wires board to the viewport; preserve its connectors and Blueprint rules. */
+    UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
+    static FString StyleWiresMinigame();
+    /** Use the interaction sphere's center and place the Gosling ring between floor and walls. */
+    UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
+    static FString FixInteractionGeometry();
     UFUNCTION(BlueprintCallable, Category="Inspection|Editor")
     static FString ConfigureClockInspection();
     /** Prevent repeated prompt animations and retire completed wardrobe indicators. */

@@ -26,6 +26,8 @@ public:
     FVector2D HandTip(EClockHand Hand) const;
     UCanvasPanel* GetSceneCanvas() const { return SceneCanvas; }
 protected:
+    virtual bool UsesDefaultInspectionHints() const override { return false; }
+    virtual void OnCloseStarted() override;
     virtual void NativeTick(const FGeometry& Geometry, float DeltaTime) override;
     virtual FReply NativeOnMouseButtonDown(const FGeometry&, const FPointerEvent&) override;
     virtual FReply NativeOnMouseButtonUp(const FGeometry&, const FPointerEvent&) override;

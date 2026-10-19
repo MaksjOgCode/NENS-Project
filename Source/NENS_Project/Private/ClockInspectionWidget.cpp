@@ -113,7 +113,7 @@ bool UClockInspectionWidget::Configure(USearchableComponent* Source, UInspection
     return true;
 }
 bool UClockInspectionWidget::IsCurrent() const { return Clock.IsValid() && Session.IsValid() && Session->GetActiveWidget() == this; }
-bool UClockInspectionWidget::IsPuzzleInteractive() const { return IsCurrent() && !Clock->IsPuzzleSolved() && !bTransitioning; }
+bool UClockInspectionWidget::IsPuzzleInteractive() const { return IsInspectionInteractive() && IsCurrent() && !Clock->IsPuzzleSolved() && !bTransitioning; }
 float UClockInspectionWidget::DisplayAngle(EClockHand Hand) const
 {
     if (Drag == EDrag::Rotate && Hand == Selected) return PreviewAngle;
@@ -289,9 +289,13 @@ void UClockInspectionWidget::NativeDestruct()
 {
     Drag = EDrag::None;
     if (HasMouseCapture() && FSlateApplication::IsInitialized()) FSlateApplication::Get().ReleaseAllPointerCapture();
-    if (IsCurrent()) Session->Close();
     Clock.Reset(); Session.Reset();
     Super::NativeDestruct();
+}
+void UClockInspectionWidget::OnCloseStarted()
+{
+    Drag = EDrag::None;
+    if (Clock.IsValid() && !Clock->IsPuzzleSolved()) RefreshHands();
 }
 
 #undef LOCTEXT_NAMESPACE
