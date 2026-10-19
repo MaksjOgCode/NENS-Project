@@ -30,6 +30,8 @@ public:
     /** Style the original disks and add the room inspection stage and placeholder cabinet. */
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString ConfigureDisksMinigame();
+    UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
+    static FString ConfigureComputerRecovery();
     /** Use the interaction sphere's center and place the Gosling ring between floor and walls. */
     UFUNCTION(BlueprintCallable, Category="Interaction|Editor")
     static FString FixInteractionGeometry();

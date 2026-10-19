@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "ClockInspectionComponent.h"
+#include "ComputerRecoverySubsystem.h"
 #include "ClockInspectionWidget.h"
 #include "InspectionSceneData.h"
 #include "InspectionSubsystem.h"
@@ -245,6 +246,7 @@ public:
             const FVector2D Point = Button->GetCachedGeometry().LocalToAbsolute(Button->GetCachedGeometry().GetLocalSize() * .5);
             Mouse(UI, Point, Point);
             if (!Test->TestTrue(TEXT("Real click collects clock punch card"), C->IsComplete())) return true;
+            Test->TestEqual(TEXT("Clock pickup click adds card to current run bag"),UComputerRecoverySubsystem::From(C)->GetInventoryCount(TEXT("PunchCard")),1);
             Test->TestFalse(TEXT("Duplicate card rejected"), C->TryCollect(TEXT("FloorClock_PunchCard")));
             Test->TestTrue(TEXT("Collecting card keeps screen open until Escape"), Session->IsOpen());
             Key(EKeys::Escape);

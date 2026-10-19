@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "ComputerRecoverySubsystem.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Tests/AutomationEditorCommon.h"
 #include "Tests/AutomationCommon.h"
@@ -165,6 +166,7 @@ public:
         else if (Step==10)
         {
             CHECK_TEST(UI->HasReportedSuccess(),TEXT("Three settled orientations report success"));
+            if (!bStandalone) Test->TestTrue(TEXT("Real valves victory restores computer fuel"),UComputerRecoverySubsystem::From(Source.Get())->IsSystemReady(EComputerSystem::Fuel));
             Test->TestTrue(TEXT("Success remains visible before fade"),UI->GetRenderOpacity()>.99f);
             FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir()/(bStandalone ? TEXT("ValvesIntegration/valves-standalone-solved.png") : TEXT("ValvesIntegration/valves-solved.png")),true,false);
             Step++; Next=Now+1.3; return false;

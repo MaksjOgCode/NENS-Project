@@ -11,7 +11,7 @@ class UInspectionSceneData;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FInspectionItemCollected, FName, PickupID, FName, ItemID);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInspectionClosed, bool, bCompleted);
 
-/** Per-object, current-session inspection progress. No inventory or save-game dependency. */
+/** Per-placement inspection progress, mirrored into the current run's item bag. No disk save. */
 UCLASS(ClassGroup=(Interaction), meta=(BlueprintSpawnableComponent))
 class NENS_PROJECT_API USearchableComponent : public UActorComponent
 {

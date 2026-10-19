@@ -18,6 +18,7 @@
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
 #include "MinigameComponent.h"
+#include "ComputerRecoverySubsystem.h"
 #include "MinigameWidget.h"
 #include "WiresMinigameWidget.h"
 #include "InteractionSessionSubsystem.h"
@@ -265,6 +266,7 @@ public:
             for (int32 Pair = 0; Pair < 3; ++Pair) Connect(SourceNow->GetActiveWidget(), Pair);
             Test->TestEqual(TEXT("Updated puzzle records three connected pairs"), ReadInt(SourceNow->GetActiveWidget(), TEXT("ConnectedCount")), 3);
             if (!Test->TestTrue(TEXT("Win reports success to computer"), SourceNow->IsComplete())) return true;
+            Test->TestTrue(TEXT("Real wires victory restores main computer power"),UComputerRecoverySubsystem::From(SourceNow)->IsSystemReady(EComputerSystem::Power));
             Test->TestTrue(TEXT("Success screen remains for original delay"), Shared->IsOpen());
             PreviousAttempt.Reset(SourceNow->GetActiveWidget());
             FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("WiresIntegration/wires-win.png"), true, false);

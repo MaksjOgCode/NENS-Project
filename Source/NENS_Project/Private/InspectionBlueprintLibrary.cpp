@@ -3,6 +3,7 @@
 #include "InspectionSubsystem.h"
 #include "InteractionSessionSubsystem.h"
 #include "MinigameComponent.h"
+#include "ComputerRecoveryComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -30,5 +31,10 @@ bool UInspectionBlueprintLibrary::OpenMinigame(AActor* Target, AActor* Interacto
 {
     if (IsValid(Target))
         if (auto* Minigame = Target->FindComponentByClass<UMinigameComponent>()) return Minigame->OpenMinigame(Interactor);
+    return false;
+}
+bool UInspectionBlueprintLibrary::OpenMainComputer(AActor* Target,AActor* Interactor)
+{
+    if (IsValid(Target)) if (auto* Computer=Target->FindComponentByClass<UComputerRecoveryComponent>()) return Computer->OpenComputer(Interactor);
     return false;
 }

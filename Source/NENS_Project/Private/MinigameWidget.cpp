@@ -90,6 +90,10 @@ void UMinigameWidget::InitializeSession(UMinigameComponent* Source)
 {
     SourceComponent = Source; bManagedSession = true;
 }
+void UMinigameWidget::InitializePresentationSession(FSimpleDelegate Closed)
+{
+    bManagedSession=true; PresentationClosed=MoveTemp(Closed);
+}
 void UMinigameWidget::ReportSuccess()
 {
     if (bReportedSuccess || !IsInteractive() || !CanReportSuccess()) return;
@@ -116,6 +120,7 @@ void UMinigameWidget::FinishClose()
     {
         // A late callback from a retired attempt cannot affect a newer modal.
         if (auto* Source = SourceComponent.Get()) Source->CloseMinigame(this);
+        else PresentationClosed.ExecuteIfBound();
     }
     else { RestoreStandaloneInput(); RemoveFromParent(); }
 }
@@ -146,6 +151,9 @@ void UMinigameWidget::NativeDestruct()
 {
     bRemoved = true; Mist.Reset(); RestoreStandaloneInput();
     if (bManagedSession)
+    {
         if (auto* Source = SourceComponent.Get()) Source->CloseMinigame(this);
+        else PresentationClosed.ExecuteIfBound();
+    }
     Super::NativeDestruct();
 }

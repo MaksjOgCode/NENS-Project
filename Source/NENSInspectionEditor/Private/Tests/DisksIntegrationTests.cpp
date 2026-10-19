@@ -16,6 +16,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWindow.h"
 #include "MinigameComponent.h"
+#include "ComputerRecoverySubsystem.h"
 #include "DisksMinigameWidget.h"
 #include "InteractionSessionSubsystem.h"
 #include "InspectionBlueprintLibrary.h"
@@ -215,6 +216,7 @@ public:
             if (Ring<2) { Test->TestFalse(TEXT("Partial image is not a win"),UI->HasReportedSuccess()); Ring++; Next=Now+.1; return false; }
             REQUIRE_DISKS(UI->HasReportedSuccess(),TEXT("Three aligned disks report success"));
             if (!bStandalone) Test->TestTrue(TEXT("Victory stored on cabinet before visual close"),Source->IsComplete());
+            if (!bStandalone) Test->TestTrue(TEXT("Real disk victory calibrates computer display"),UComputerRecoverySubsystem::From(Source.Get())->IsSystemReady(EComputerSystem::Display));
         }
         else if (Step==15)
         {

@@ -1,11 +1,18 @@
 #include "MinigameComponent.h"
 #include "MinigameWidget.h"
 #include "InteractionSessionSubsystem.h"
+#include "ComputerRecoverySubsystem.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 
 UMinigameComponent::UMinigameComponent() { PrimaryComponentTick.bCanEverTick = false; }
+void UMinigameComponent::BeginPlay()
+{
+    Super::BeginPlay();
+    if (RepairedSystem != EComputerSystem::None)
+        if (auto* Progress=UComputerRecoverySubsystem::From(this)) bCompleted=Progress->HasCompletedSource(UComputerRecoverySubsystem::PlacementKey(this));
+}
 bool UMinigameComponent::OpenMinigame(AActor* Interactor)
 {
     if (bCompleted || ActiveWidget || !WidgetClass || !IsValid(Interactor)) return false;
@@ -30,6 +37,7 @@ bool UMinigameComponent::ConfirmSuccess(UMinigameWidget* Reporter)
     auto* Session = ActiveSession.Get();
     if (bCompleted || !Reporter || ActiveWidget != Reporter || !Session || !Session->IsActive(Reporter)) return false;
     bCompleted = true;
+    if (auto* Progress=UComputerRecoverySubsystem::From(this)) Progress->MarkSystemReady(RepairedSystem,UComputerRecoverySubsystem::PlacementKey(this));
     OnSucceeded.Broadcast();
     return true;
 }

@@ -12,4 +12,5 @@ public:
     UFUNCTION(BlueprintPure, Category="Inspection") static bool IsInteractionInputAllowed(AActor* Interactor);
     UFUNCTION(BlueprintCallable, Category="Inspection") static void OpenInspection(AActor* Target, AActor* Interactor);
     UFUNCTION(BlueprintCallable, Category="Interaction|Minigame") static bool OpenMinigame(AActor* Target, AActor* Interactor);
+    UFUNCTION(BlueprintCallable, Category="Interaction|Recovery") static bool OpenMainComputer(AActor* Target, AActor* Interactor);
 };

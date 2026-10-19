@@ -5,6 +5,7 @@
 #include "GameFramework/PlayerController.h"
 #include "InspectionSceneData.h"
 #include "InspectionSubsystem.h"
+#include "ComputerRecoverySubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSearchable, Log, All);
 
@@ -26,7 +27,7 @@ bool USearchableComponent::IsComplete() const
     }
     for (const FInspectionPickup& Pickup : Scene->Pickups)
     {
-        if (!CollectedPickupIDs.Contains(Pickup.PickupID))
+        if (!IsCollected(Pickup.PickupID))
         {
             return false;
         }
@@ -36,12 +37,15 @@ bool USearchableComponent::IsComplete() const
 
 bool USearchableComponent::IsCollected(FName PickupID) const
 {
-    return !PickupID.IsNone() && CollectedPickupIDs.Contains(PickupID);
+    if (PickupID.IsNone()) return false;
+    if (CollectedPickupIDs.Contains(PickupID)) return true;
+    if (auto* Progress=UComputerRecoverySubsystem::From(this)) return Progress->HasCollected(UComputerRecoverySubsystem::PlacementKey(this,PickupID));
+    return false;
 }
 
 bool USearchableComponent::TryCollect(FName PickupID)
 {
-    if (!IsValid(Scene) || PickupID.IsNone() || CollectedPickupIDs.Contains(PickupID))
+    if (!IsValid(Scene) || PickupID.IsNone() || IsCollected(PickupID))
     {
         return false;
     }
@@ -62,6 +66,7 @@ bool USearchableComponent::TryCollect(FName PickupID)
     // Copy before broadcasting: a subscriber may change the scene or close the UI.
     const FName ItemID = Pickup->ItemID;
     CollectedPickupIDs.Add(PickupID);
+    if (auto* Progress=UComputerRecoverySubsystem::From(this)) Progress->CollectItem(UComputerRecoverySubsystem::PlacementKey(this,PickupID),PickupID,ItemID);
     OnItemCollected.Broadcast(PickupID, ItemID);
     return true;
 }

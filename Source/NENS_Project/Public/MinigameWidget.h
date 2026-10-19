@@ -14,6 +14,8 @@ class NENS_PROJECT_API UMinigameWidget : public UUserWidget
 public:
     UMinigameWidget(const FObjectInitializer& ObjectInitializer);
     void InitializeSession(UMinigameComponent* Source);
+    /** Reuse modal presentation for terminals which do not report a minigame win. */
+    void InitializePresentationSession(FSimpleDelegate Closed);
     UFUNCTION(BlueprintCallable, Category="Minigame") void ReportSuccess();
     UFUNCTION(BlueprintCallable, Category="Minigame") void RequestClose();
     UFUNCTION(BlueprintPure, Category="Minigame") bool HasReportedSuccess() const { return bReportedSuccess; }
@@ -50,4 +52,5 @@ private:
     TSharedPtr<SInspectionMist> Mist;
     void FinishClose();
     void RestoreStandaloneInput();
+    FSimpleDelegate PresentationClosed;
 };

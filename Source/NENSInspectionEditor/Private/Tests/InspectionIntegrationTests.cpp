@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "ComputerRecoverySubsystem.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Tests/AutomationEditorCommon.h"
 #include "Tests/AutomationCommon.h"
@@ -182,6 +183,7 @@ public:
             if (!Test->TestEqual(TEXT("One card shown"), Session->GetActiveWidget()->GetPickupButtons().Num(), 1)) return true;
             Test->TestTrue(TEXT("Card mouse click routed"), Click(Session->GetActiveWidget()->GetPickupButtons()[0]));
             Test->TestTrue(TEXT("Pickup is committed at the beginning of its animation"), C->IsComplete());
+            Test->TestEqual(TEXT("Wardrobe pickup click adds card to current run bag"),UComputerRecoverySubsystem::From(C)->GetInventoryCount(TEXT("PunchCard")),1);
             Test->TestTrue(TEXT("Pickup begins fading rather than disappearing instantly"), Session->GetActiveWidget()->GetPickupButtons()[0]->IsCollectionFading());
             Test->TestEqual(TEXT("Fading pickup no longer accepts clicks"), Session->GetActiveWidget()->GetPickupButtons()[0]->GetVisibility(), ESlateVisibility::HitTestInvisible);
             Step++; Next = Now + .12; return false;
