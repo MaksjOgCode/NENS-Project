@@ -19,8 +19,9 @@ public:
     UFUNCTION(BlueprintPure, Category="Minigame") bool HasReportedSuccess() const { return bReportedSuccess; }
     bool IsOpening() const { return !bRemoved && !bClosing && FadeAge < SceneFadeInSeconds; }
     bool IsClosing() const { return bClosing; }
-    bool IsInteractive() const { return !bRemoved && !bClosing && !IsOpening(); }
+    virtual bool IsInteractive() const { return !bRemoved && !bClosing && !IsOpening(); }
 protected:
+    bool IsManagedSession() const { return bManagedSession; }
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Minigame|Transition", meta=(ClampMin="0",ClampMax="2")) float SceneFadeInSeconds = .3f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Minigame|Transition", meta=(ClampMin="0",ClampMax="2")) float SceneFadeOutSeconds = .24f;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Minigame|Appearance") TObjectPtr<UFont> InterfaceFont;
