@@ -148,10 +148,13 @@ public:
         {
             for (TActorIterator<AActor> It(World); It; ++It)
             {
-                if (auto* C = It->FindComponentByClass<UMinigameComponent>()) { Source = C; Computer = *It; }
                 if (auto* C = It->FindComponentByClass<USearchableComponent>())
                     if (C->Scene && C->Scene->GetFName() == TEXT("DA_Inspection_Wardrobe")) Wardrobe = C;
             }
+            auto* Class=LoadClass<AActor>(nullptr,TEXT("/Game/NENS/Environment/Interior/Props/Blueprints/BP_Props_ElectroStation.BP_Props_ElectroStation_C"));
+            if (!Test->TestNotNull(TEXT("Electrostation wires class"),Class)) return true;
+            Computer=World->SpawnActor<AActor>(Class,FVector(3000,3000,0),FRotator::ZeroRotator);
+            if (Computer.IsValid()) Source=Computer->FindComponentByClass<UMinigameComponent>();
             if (!Test->TestNotNull(TEXT("Configured computer on gameplay map"), Source.Get()) || !Test->TestNotNull(TEXT("Wardrobe for modal exclusion"), Wardrobe.Get())) return true;
             for (auto* C : PC->GetPawn()->GetComponents()) if (C->FindFunction(TEXT("TryInteract"))) Interaction = C;
             auto* Point = SceneComponent(Computer.Get(), TEXT("Sphere_Interaction"));

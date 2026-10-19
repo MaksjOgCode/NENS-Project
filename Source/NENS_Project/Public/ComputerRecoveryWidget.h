@@ -20,8 +20,8 @@ protected:
 private:
     UPROPERTY(Transient) TWeakObjectPtr<UComputerRecoverySubsystem> Progress;
     float DisplayedProgress = 0;
-    float ReadyOpacity[4] = {1,1,1,1};
-    bool LastReady[4] = {false,false,false,false};
+    float ReadyOpacity[5] = {1,1,1,1,1};
+    bool LastReady[5] = {false,false,false,false,false};
     UFUNCTION() void Refresh();
     UFUNCTION() void LoadCards();
     UFUNCTION() void RestoreComputer();

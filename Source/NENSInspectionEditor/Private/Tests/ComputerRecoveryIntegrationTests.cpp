@@ -150,6 +150,8 @@ public:
             P->MarkSystemReady(EComputerSystem::Fuel,TEXT("test-valves"));
             Test->TestFalse(TEXT("Missing display blocks recovery despite full program"),P->CanRestore());
             P->MarkSystemReady(EComputerSystem::Display,TEXT("test-disks"));
+            Test->TestFalse(TEXT("Arithmetic check still required"),P->CanRestore());
+            P->MarkSystemReady(EComputerSystem::Arithmetic,TEXT("test-arithmetic"));
             Test->TestTrue(TEXT("Complete systems and cards unlock restore button"),P->CanRestore() && UI->WidgetTree->FindWidget(TEXT("Btn_Restore"))->GetIsEnabled());
             if (auto Window=FSlateApplication::Get().FindWidgetWindow(UI->TakeWidget())) { OriginalSize=Window->GetSizeInScreen(); Window->Resize(FVector2D(1000,900)); }
             break;

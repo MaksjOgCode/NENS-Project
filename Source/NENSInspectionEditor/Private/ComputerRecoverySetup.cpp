@@ -93,19 +93,19 @@ FString UInspectionEditorLibrary::ConfigureComputerRecovery()
         Progress->SetWidgetStyle(ProgressStyle); Progress->SetFillColorAndOpacity(FLinearColor::White); Progress->SetVisibility(ESlateVisibility::HitTestInvisible);
         Place(Scene,Progress,FVector2D(80,848),FVector2D(580,12));
         auto* Hint=Text(Scene,TEXT("Txt_NextStep"),TEXT("Connect the wires to restore power."),24,FVector2D(80,888),FVector2D(580,100)); Hint->SetAutoWrapText(true);
-        const TCHAR* Keys[]={TEXT("Power"),TEXT("Fuel"),TEXT("Display"),TEXT("Program")};
-        const TCHAR* Labels[]={TEXT("POWER SUPPLY"),TEXT("FUEL SUPPLY"),TEXT("DISPLAY"),TEXT("RECOVERY PROGRAM")};
-        const TCHAR* Hints[]={TEXT("Connect the wires to supply electricity."),TEXT("Turn the valves to restore the fuel flow."),TEXT("Align the disks to calibrate the image."),TEXT("Find the punch cards and load them into the reader.")};
-        for (int32 I=0;I<4;++I)
+        const TCHAR* Keys[]={TEXT("Power"),TEXT("Fuel"),TEXT("Display"),TEXT("Arithmetic"),TEXT("Program")};
+        const TCHAR* Labels[]={TEXT("POWER SUPPLY"),TEXT("FUEL SUPPLY"),TEXT("DISPLAY"),TEXT("ARITHMETIC CHECK"),TEXT("RECOVERY PROGRAM")};
+        const TCHAR* Hints[]={TEXT("Connect the wires to supply electricity."),TEXT("Turn the valves to restore the fuel flow."),TEXT("Align the disks to calibrate the image."),TEXT("Verify the result at the small computer."),TEXT("Find the punch cards and load them into the reader.")};
+        for (int32 I=0;I<5;++I)
         {
             auto* Border=Tree->ConstructWidget<UBorder>(UBorder::StaticClass(),FName(*FString::Printf(TEXT("Panel_%s"),Keys[I])));
             Border->SetBrush(FSlateRoundedBoxBrush(FLinearColor(.023f,.024f,.025f,.94f),6.f,FLinearColor(.17f,.17f,.16f,1),1.f)); Border->SetPadding(FMargin(0));
-            Place(Scene,Border,FVector2D(720,210+I*164),FVector2D(760,148));
+            Place(Scene,Border,FVector2D(720,210+I*130),FVector2D(760,118));
             auto* Row=Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),FName(*FString::Printf(TEXT("Row_%s"),Keys[I]))); Border->AddChild(Row);
             Text(Row,FName(*FString::Printf(TEXT("Txt_%sLabel"),Keys[I])),Labels[I],20,FVector2D(24,18),FVector2D(470,34),FLinearColor(.62f,.61f,.57f,1));
-            auto* Status=Text(Row,FName(*FString::Printf(TEXT("Txt_%sStatus"),Keys[I])),I<3 ? TEXT("OFFLINE") : TEXT("0 / 2 LOADED"),24,FVector2D(490,18),FVector2D(246,36));
+            auto* Status=Text(Row,FName(*FString::Printf(TEXT("Txt_%sStatus"),Keys[I])),I<4 ? TEXT("OFFLINE") : TEXT("0 / 2 LOADED"),24,FVector2D(490,18),FVector2D(246,36));
             Status->SetJustification(ETextJustify::Right);
-            auto* Copy=Text(Row,FName(*FString::Printf(TEXT("Txt_%sHint"),Keys[I])),Hints[I],24,FVector2D(24,64),FVector2D(712,76)); Copy->SetAutoWrapText(true);
+            auto* Copy=Text(Row,FName(*FString::Printf(TEXT("Txt_%sHint"),Keys[I])),Hints[I],22,FVector2D(24,54),FVector2D(712,64)); Copy->SetAutoWrapText(true);
         }
         FButtonStyle ButtonStyle;
         ButtonStyle.SetNormal(FSlateRoundedBoxBrush(FLinearColor(.035f,.035f,.034f,1),4.f,FLinearColor(.38f,.37f,.32f,1),1.f));
@@ -176,7 +176,8 @@ FString UInspectionEditorLibrary::ConfigureComputerRecovery()
     FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Computer);
     CHECK_RECOVERY(SuccessJSON(CompileAndSave(Computer,false)),TEXT("Computer interaction compile failed"));
     const TPair<const TCHAR*,EComputerSystem> Stations[]={
-        {TEXT("/Game/NENS/Environment/Interior/Blueprints/BP_ComputerCabinet.BP_ComputerCabinet"),EComputerSystem::Power},
+        {TEXT("/Game/NENS/Environment/Interior/Props/Blueprints/BP_Props_ElectroStation.BP_Props_ElectroStation"),EComputerSystem::Power},
+        {TEXT("/Game/NENS/Environment/Interior/Blueprints/BP_ComputerCabinet.BP_ComputerCabinet"),EComputerSystem::Arithmetic},
         {TEXT("/Game/NENS/Environment/Interior/Props/Blueprints/BP_Props_PickMeBox.BP_Props_PickMeBox"),EComputerSystem::Fuel},
         {TEXT("/Game/NENS/Environment/Interior/Blueprints/BP_BedsideCabinet.BP_BedsideCabinet"),EComputerSystem::Display}};
     TArray<UBlueprint*> SaveList={Widget,Computer};
@@ -192,6 +193,6 @@ FString UInspectionEditorLibrary::ConfigureComputerRecovery()
         SaveList.Add(BP);
     }
     for (auto* BP : SaveList) CHECK_RECOVERY(Save(BP),TEXT("Could not save recovery Blueprint"));
-    return FString::Printf(TEXT("{\"success\":true,\"blueprints\":5,\"required_cards\":%d,\"levels_modified\":0}"),Cards.Num());
+    return FString::Printf(TEXT("{\"success\":true,\"blueprints\":6,\"required_cards\":%d,\"levels_modified\":0}"),Cards.Num());
 }
 #undef CHECK_RECOVERY

@@ -24,6 +24,9 @@ class NENS_PROJECT_API UComputerRecoverySubsystem : public UGameInstanceSubsyste
     GENERATED_BODY()
 public:
     bool Configure(UComputerRecoveryData* Data);
+    /** A new run clears solved systems and collected cards, including the boot timer. */
+    void ResetForNewGame();
+    void HideObjective();
     static UComputerRecoverySubsystem* From(const UObject* Context);
     static FString PlacementKey(const UActorComponent* Source,FName PickupID = NAME_None);
     bool CollectItem(const FString& SourceKey,FName PickupID,FName ItemID);
@@ -31,6 +34,8 @@ public:
     bool MarkSystemReady(EComputerSystem System,const FString& SourceKey);
     bool HasCompletedSource(const FString& SourceKey) const { return CompletedSources.Contains(SourceKey); }
     UFUNCTION(BlueprintPure, Category="Recovery") bool IsSystemReady(EComputerSystem System) const { return System != EComputerSystem::None && ReadySystems.Contains(System); }
+    UFUNCTION(BlueprintPure, Category="Recovery") int32 GetReadySystemCount() const { return ReadySystems.Num(); }
+    static constexpr int32 RequiredSystemCount=4;
     UFUNCTION(BlueprintPure, Category="Recovery") int32 GetInventoryCount(FName ItemID) const;
     UFUNCTION(BlueprintPure, Category="Recovery") int32 GetRequiredCardCount() const { return RequiredCards.Num(); }
     UFUNCTION(BlueprintPure, Category="Recovery") int32 GetLoadedCardCount() const { return LoadedCards.Num(); }

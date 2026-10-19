@@ -1,4 +1,4 @@
-# Провода и BP_ComputerCabinet
+# Провода и BP_Props_ElectroStation
 
 Настройки шрифта, адаптивного макета, градиента и дымки: [WiresPresentation.md](WiresPresentation.md).
 
@@ -12,11 +12,11 @@
 
 | Ресурс | Где лежит | Что здесь находится |
 |---|---|---|
-| `BP_ComputerCabinet` | `/Game/NENS/Environment/Interior/Blueprints` | Вход в мини-игру и реакция компьютера на завершение |
+| `BP_Props_ElectroStation` | `/Game/NENS/Environment/Interior/Props/Blueprints` | Вход в мини-игру и реакция компьютера на завершение |
 | `WBP_WiresMiniGame` | `/Game/Minigames/Wires` | Внешний вид, кнопки, `CheckPair`, переменные `SelectedLeft`/`ConnectedCount`, `Win` |
 | `L_Test_Wires` | `/Game/Minigames/Wires` | Прежний отдельный запуск для проверки проводов |
 
-В `BP_ComputerCabinet → Components` добавлен компонент **Minigame**, класс C++ `MinigameComponent`. Его `Widget Class` назначен на существующий `WBP_WiresMiniGame`.
+В `BP_Props_ElectroStation → Components` добавлен компонент **Minigame**, класс C++ `MinigameComponent`. Его `Widget Class` назначен на существующий `WBP_WiresMiniGame`.
 
 `Event Interact` вызывает ноду `Open Minigame`:
 
@@ -108,7 +108,7 @@ On Minigame Closed (Minigame)
 - `NENS.Interaction.Minigame.OriginalTestLevel` — прежний тестовый уровень самостоятельно создаёт виджет, игру можно выиграть, секундная задержка корректно закрывает её.
 - Все четыре прежних теста `NENS.Inspection` — регрессия шкафа и прогресса на общем вводе.
 
-Все шесть тестов прошли, новых Accessed None/RingMID ошибок нет. Проверка хешей подтвердила изменение только `BP_ComputerCabinet` и `WBP_WiresMiniGame` среди существующих Content-файлов. Тестовые карты, шкаф и прочие ассеты не изменены.
+Все шесть тестов прошли, новых Accessed None/RingMID ошибок нет. Проверка хешей подтвердила изменение только `BP_Props_ElectroStation` и `WBP_WiresMiniGame` среди существующих Content-файлов. Тестовые карты, шкаф и прочие ассеты не изменены.
 
 Сборки `NENS_ProjectEditor Win64 Development` и `NENS_Project Win64 Development` успешны. Десять связанных Blueprint проверены компиляцией без сохранения; у них 0 ошибок и 0 предупреждений. Адаптированный WBP проводов также скомпилирован при сохранении интеграции.
 
